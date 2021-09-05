@@ -266,6 +266,8 @@ if (MSVC)
 else()
   add_compile_options("-Wall" "-Wextra")
   add_compile_options("-Wno-unused-local-typedefs")
+  # NOTE(diego): pybind11 marks PyEval_InitThreads as deprecated, and shows a lot
+  add_compile_options("-Wno-deprecated-declarations")
   if (CMAKE_CXX_COMPILER_ID MATCHES "Intel")
     # Quench inlining-related remarks
     add_compile_options("-wd11074" "-wd11076")

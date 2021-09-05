@@ -60,6 +60,7 @@ template <typename Value, size_t Size>          struct Vector;
 template <typename Value, size_t Size>          struct Point;
 template <typename Value, size_t Size>          struct Normal;
 template <typename Value, size_t Size>          struct Color;
+template <typename Value, size_t Size>          struct TimedColor;
 template <typename Value, size_t Size>          struct Spectrum;
 template <typename Point>                       struct Transform;
 template <typename Point, typename Spectrum>    struct Ray;
