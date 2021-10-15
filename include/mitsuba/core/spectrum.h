@@ -56,6 +56,8 @@ struct Color : enoki::StaticArrayImpl<Value_, Size_, false, Color<Value_, Size_>
 //! @{ \name Data types for RGB data WITH additional time information
 // =======================================================================
 
+#define MTS_SPEED_OF_LIGHT 299792458.0f
+
 template <typename Value_, size_t Size_ = 3>
 struct TimedColor : enoki::StaticArrayImpl<Value_, Size_ + 1, false, TimedColor<Value_, Size_>> {
     using Base = enoki::StaticArrayImpl<Value_, Size_ + 1, false, TimedColor<Value_, Size_>>;
@@ -87,8 +89,14 @@ struct TimedColor : enoki::StaticArrayImpl<Value_, Size_ + 1, false, TimedColor<
     template <typename Value2_ = Value_, size_t Size2_ = Size_>
     Color<Value2_, Size2_> color() const { return enoki::head<Size2_>(*this); }
 
-    decltype(auto) time() const { return Base::operator[](Size_); }
-    decltype(auto) time() { return Base::operator[](Size_); }
+    decltype(auto) opl() const { return Base::operator[](Size_); }
+    decltype(auto) opl() { return Base::operator[](Size_); }
+
+    decltype(auto) time() const { return this->opl() / MTS_SPEED_OF_LIGHT; }
+    decltype(auto) time() { return this->opl() / MTS_SPEED_OF_LIGHT; }
+
+    void add_opl(Value_ opl) { this->opl() += opl; }
+    void add_opl(Value_ distance, Value_ medium_eta) { this->opl() += distance * medium_eta; }
 
     ENOKI_ARRAY_IMPORT(Base, TimedColor)
 };
@@ -154,6 +162,15 @@ struct Color<enoki::detail::MaskedArray<Value_>, Size_>
     using Base::Base;
     using Base::operator=;
     Color(const Base &b) : Base(b) { }
+};
+
+template <typename Value_, size_t Size_>
+struct TimedColor<enoki::detail::MaskedArray<Value_>, Size_>
+    : enoki::detail::MaskedArray<TimedColor<Value_, Size_>> {
+    using Base = enoki::detail::MaskedArray<TimedColor<Value_, Size_>>;
+    using Base::Base;
+    using Base::operator=;
+    TimedColor(const Base &b) : Base(b) { }
 };
 
 template <typename Value_, size_t Size_>
