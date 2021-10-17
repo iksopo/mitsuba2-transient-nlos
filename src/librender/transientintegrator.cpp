@@ -301,7 +301,7 @@ TransientSamplingIntegrator<Float, Spectrum>::render_sample(const Scene *scene,
     std::vector<RadianceSample<Float, UnpolarizedSpectrum, Mask>> radianceSampleVector_u = {};
     for(const auto &radianceSampleRecord : radianceSamplesRecordVector) {
         radianceSampleVector_u.emplace_back(
-            radianceSampleRecord.time,
+            radianceSampleRecord.opl,
             depolarize(radianceSampleRecord.radiance * ray_weight),
             radianceSampleRecord.mask
         );
@@ -311,7 +311,7 @@ TransientSamplingIntegrator<Float, Spectrum>::render_sample(const Scene *scene,
         ENOKI_MARK_USED(ray.wavelengths);
         for(const auto &radianceSampleRecord_u : radianceSampleVector_u) {
             xyzVector.emplace_back(
-                radianceSampleRecord_u.time,
+                radianceSampleRecord_u.opl,
                 radianceSampleRecord_u.radiance.x(),
                 radianceSampleRecord_u.mask
             );
@@ -320,7 +320,7 @@ TransientSamplingIntegrator<Float, Spectrum>::render_sample(const Scene *scene,
         ENOKI_MARK_USED(ray.wavelengths);
         for(const auto &radianceSampleRecord_u : radianceSampleVector_u) {
             xyzVector.emplace_back(
-                radianceSampleRecord_u.time,
+                radianceSampleRecord_u.opl,
                 srgb_to_xyz(radianceSampleRecord_u.radiance, radianceSampleRecord_u.mask),
                 radianceSampleRecord_u.mask
             );
@@ -329,7 +329,7 @@ TransientSamplingIntegrator<Float, Spectrum>::render_sample(const Scene *scene,
         static_assert(is_spectral_v<Spectrum>);
         for(const auto &radianceSampleRecord_u : radianceSampleVector_u) {
             xyzVector.emplace_back(
-                radianceSampleRecord_u.time,
+                radianceSampleRecord_u.opl,
                 spectrum_to_xyz(radianceSampleRecord_u.radiance, ray.wavelengths, radianceSampleRecord_u.mask),
                 radianceSampleRecord_u.mask
             );
@@ -354,8 +354,7 @@ TransientSamplingIntegrator<Float, Spectrum>::render_sample(const Scene *scene,
            (aovsRecordVector.size() == radianceSamplesRecordVector.size()));
     if(aovsRecordVector.empty()) {
         for(const auto &xyzRecord: xyzVector) {
-            FloatTimeSample<Float, Mask> color(-1);
-            color.set_time(xyzRecord.time, xyzRecord.mask);
+            FloatTimeSample<Float, Mask> color(xyzRecord.opl, xyzRecord.mask);
             // Reversed
             color.push_front(1.f);
             color.push_front(select(xyzRecord.mask, Float(1.f), Float(0.f)));
@@ -382,7 +381,7 @@ TransientSamplingIntegrator<Float, Spectrum>::render_sample(const Scene *scene,
         color[2] = xyzRecord.radiance.z();
         color[3] = select(xyzRecord.mask, Float(1.f), Float(0.f));
         color[4] = 1.f;
-        values.emplace_back(xyzRecord.time, color, xyzRecord.mask);
+        values.emplace_back(xyzRecord.opl, color, xyzRecord.mask);
     }
 
     block->put(position_sample, aovsRecordVector);

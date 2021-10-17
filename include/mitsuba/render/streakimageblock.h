@@ -120,47 +120,43 @@ public:
         if (unlikely(m_channel_count != 5))
             Throw("ImageBlock::put(): non-standard image block configuration! (AOVs?)");
         std::vector<RadianceSample<Float, UnpolarizedSpectrum, Mask>> radianceSampleVector_u = {};
-        for(const auto &radianceSampleRecord : radianceSampleVector) {
+        for (const auto &radianceSampleRecord : radianceSampleVector) {
             radianceSampleVector_u.emplace_back(
-                radianceSampleRecord.time,
+                radianceSampleRecord.opl,
                 depolarize(radianceSampleRecord.radiance),
-                radianceSampleRecord.mask
-                );
+                radianceSampleRecord.mask);
         }
         std::vector<RadianceSample<Float, Color3f, Mask>> xyzVector;
         if constexpr (is_monochromatic_v<Spectrum>) {
             ENOKI_MARK_USED(wavelengths);
-            for(const auto &radianceSampleRecord_u : radianceSampleVector_u) {
-                xyzVector.emplace_back(
-                    radianceSampleRecord_u.time,
-                    radianceSampleRecord_u.radiance.x(),
-                    radianceSampleRecord_u.mask
-                    );
+            for (const auto &radianceSampleRecord_u : radianceSampleVector_u) {
+                xyzVector.emplace_back(radianceSampleRecord_u.time(),
+                                       radianceSampleRecord_u.radiance.x(),
+                                       radianceSampleRecord_u.mask);
             }
         } else if constexpr (is_rgb_v<Spectrum>) {
             ENOKI_MARK_USED(wavelengths);
-            for(const auto &radianceSampleRecord_u : radianceSampleVector_u) {
+            for (const auto &radianceSampleRecord_u : radianceSampleVector_u) {
                 xyzVector.emplace_back(
-                    radianceSampleRecord_u.time,
-                    srgb_to_xyz(radianceSampleRecord_u.radiance, radianceSampleRecord_u.mask),
-                    radianceSampleRecord_u.mask
-                );
+                    radianceSampleRecord_u.time(),
+                    srgb_to_xyz(radianceSampleRecord_u.radiance,
+                                radianceSampleRecord_u.mask),
+                    radianceSampleRecord_u.mask);
             }
         } else {
             static_assert(is_spectral_v<Spectrum>);
-            for(const auto &radianceSampleRecord_u : radianceSampleVector_u) {
+            for (const auto &radianceSampleRecord_u : radianceSampleVector_u) {
                 xyzVector.emplace_back(
-                    radianceSampleRecord_u.time,
-                    spectrum_to_xyz(radianceSampleRecord_u.radiance, wavelengths, radianceSampleRecord_u.mask),
-                    radianceSampleRecord_u.mask
-                );
+                    radianceSampleRecord_u.time(),
+                    spectrum_to_xyz(radianceSampleRecord_u.radiance,
+                                    wavelengths, radianceSampleRecord_u.mask),
+                    radianceSampleRecord_u.mask);
             }
         }
 
         std::vector<FloatTimeSample<Float, Mask>> values;
         for(const auto &xyzRecord: xyzVector) {
-            FloatTimeSample<Float, Mask> color(-1);
-            color.set_time(xyzRecord.time, xyzRecord.mask);
+            FloatTimeSample<Float, Mask> color(xyzRecord.opl, xyzRecord.mask);
             // Reversed
             color.push_front(1.f);
             color.push_front(select(xyzRecord.mask, Float(1.f), Float(0.f)));

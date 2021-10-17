@@ -7,35 +7,55 @@
 
 NAMESPACE_BEGIN(mitsuba)
 
-// TODO: see if this should have an interface to be called from Python
-template <typename Float, typename Value, typename Mask>
+#define MTS_SPEED_OF_LIGHT 299792458.0f
+
+/**
+ * \brief Spectrum container with additional time information. Whereas standard
+ * integrators return a `std::pair<Spectrum, Mask>`, transient integrators
+ * return multiple separated RadianceSamples.
+ *
+ * \remark Time is stored as optical path length (i.e. distance * medium_ior),
+ * because speed of light is big
+ *
+ * TODO(jorge): see if this should have an interface to be called from Python
+ */
+template <typename Float, typename Spectrum, typename Mask>
 struct MTS_EXPORT_RENDER RadianceSample {
-    Float time;
-    Value radiance;
+    Float opl;
+    Spectrum radiance;
     Mask mask;
 
-    RadianceSample(Float time, Value radiance, Mask mask)
-        : time(time), radiance(radiance), mask(mask) {}
+    RadianceSample(Float opl, Spectrum radiance, Mask mask)
+        : opl(opl), radiance(radiance), mask(mask) {}
+
+    void add_opl(Float opl) { opl += opl; }
+    void add_opl(Float distance, Float medium_eta) {
+        opl += distance * medium_eta;
+    }
+
+    decltype(auto) time() const { return opl / MTS_SPEED_OF_LIGHT; }
+    decltype(auto) time() { return opl / MTS_SPEED_OF_LIGHT; }
 };
 
+/**
+ * \brief Contains arbitrary time-tagged color information (i.e. a `std::deque`
+ * of values instead of `Spectrum`)
+ * 
+ * \remark Time is stored as optical path length (i.e. distance * medium_ior),
+ * because speed of light is big
+ */
 template <typename Float, typename Mask>
 struct MTS_EXPORT_RENDER FloatTimeSample {
-    Float time;
+    Float opl;
     std::deque<Float> values;
     Mask mask;
 
-    int capacity;
-    int filled_from;
+    FloatTimeSample(Float opl, Mask mask) : opl(opl), mask(mask) {}
 
-public:
-    FloatTimeSample(int _capacity) : capacity(_capacity), filled_from(_capacity) {}
+    void push_front(Float value) { values.push_front(value); }
 
-    void set_time(Float _time, Mask _mask) { this->time = _time; this->mask = _mask;}
-
-    void push_front(Float _value) {
-        // assert(filled_from > 0);
-        values.push_front(_value);
-    }
+    decltype(auto) time() const { return opl / MTS_SPEED_OF_LIGHT; }
+    decltype(auto) time() { return opl / MTS_SPEED_OF_LIGHT; }
 };
 
 NAMESPACE_END(mitsuba)

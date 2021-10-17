@@ -53,58 +53,6 @@ struct Color : enoki::StaticArrayImpl<Value_, Size_, false, Color<Value_, Size_>
 // =======================================================================
 
 // =======================================================================
-//! @{ \name Data types for RGB data WITH additional time information
-// =======================================================================
-
-#define MTS_SPEED_OF_LIGHT 299792458.0f
-
-template <typename Value_, size_t Size_ = 3>
-struct TimedColor : enoki::StaticArrayImpl<Value_, Size_ + 1, false, TimedColor<Value_, Size_>> {
-    using Base = enoki::StaticArrayImpl<Value_, Size_ + 1, false, TimedColor<Value_, Size_>>;
-
-    /// Helper alias used to implement type promotion rules
-    template <typename T> using ReplaceValue = TimedColor<T, Size_>;
-
-    using ArrayType = TimedColor;
-    using MaskType  = enoki::Mask<Value_, Size_ + 1>;
-
-    TimedColor() = default;
-
-    template <typename Value2_ = Value_, size_t Size2_ = Size_>
-    TimedColor(const Color<Value2_, Size2_> &color, const Value2_ &time = 0)
-        : Base(color.x(), color.y(), color.z(), time) {}
-
-    decltype(auto) r() const { return Base::x(); }
-    decltype(auto) r() { return Base::x(); }
-
-    decltype(auto) g() const { return Base::y(); }
-    decltype(auto) g() { return Base::y(); }
-
-    decltype(auto) b() const { return Base::z(); }
-    decltype(auto) b() { return Base::z(); }
-
-    template <typename Value2_ = Value_, size_t Size2_ = Size_>
-    operator Color<Value2_, Size2_>() const { return this->color(); }
-
-    template <typename Value2_ = Value_, size_t Size2_ = Size_>
-    Color<Value2_, Size2_> color() const { return enoki::head<Size2_>(*this); }
-
-    decltype(auto) opl() const { return Base::operator[](Size_); }
-    decltype(auto) opl() { return Base::operator[](Size_); }
-
-    decltype(auto) time() const { return this->opl() / MTS_SPEED_OF_LIGHT; }
-    decltype(auto) time() { return this->opl() / MTS_SPEED_OF_LIGHT; }
-
-    void add_opl(Value_ opl) { this->opl() += opl; }
-    void add_opl(Value_ distance, Value_ medium_eta) { this->opl() += distance * medium_eta; }
-
-    ENOKI_ARRAY_IMPORT(Base, TimedColor)
-};
-
-//! @}
-// =======================================================================
-
-// =======================================================================
 //! @{ \name Data types for spectral quantities with sampled wavelengths
 // =======================================================================
 
@@ -162,15 +110,6 @@ struct Color<enoki::detail::MaskedArray<Value_>, Size_>
     using Base::Base;
     using Base::operator=;
     Color(const Base &b) : Base(b) { }
-};
-
-template <typename Value_, size_t Size_>
-struct TimedColor<enoki::detail::MaskedArray<Value_>, Size_>
-    : enoki::detail::MaskedArray<TimedColor<Value_, Size_>> {
-    using Base = enoki::detail::MaskedArray<TimedColor<Value_, Size_>>;
-    using Base::Base;
-    using Base::operator=;
-    TimedColor(const Base &b) : Base(b) { }
 };
 
 template <typename Value_, size_t Size_>
@@ -277,22 +216,9 @@ Color<Float, 3> spectrum_to_xyz(const Spectrum<Float, Size> &value,
              hmean(XYZ.z() * value) };
 }
 
-////////////////////////////////////////////////////////////////////////////////
-// sRGB to XYZ conversion and vice-versa
-//
-// NOTE(diego): depending on what we are compiling, we might want to define
-//   (a) two overloaded conversion functions (for TimedColor and Color) or
-//   (b) only one, as enoki::vectorize cannot assume the function type when it
-//       is overloaded
-// Case (b) is required when creating python bindings, and in this case the
-// MTS_VARIANT_TRANSIENT flag should be set as we are compiling for a specific
-// Spectrum variant
-// The other case (a) is required for librender, which (I think) is
-// Spectrum-independent, does not set MTS_VARIANT_TRANSIENT, does not vectorize
-// and thus the function can be overloaded without problems
-
+/// Convert ITU-R Rec. BT.709 linear RGB to XYZ tristimulus values
 template <typename Float>
-MTS_INLINE Color<Float, 3> _srgb_to_xyz(const Color<Float, 3> &rgb) {
+Color<Float, 3> srgb_to_xyz(const Color<Float, 3> &rgb, mask_t<Float> /*active*/ = true) {
     using ScalarMatrix3f = enoki::Matrix<scalar_t<Float>, 3>;
     const ScalarMatrix3f M(0.412453f, 0.357580f, 0.180423f,
                            0.212671f, 0.715160f, 0.072169f,
@@ -300,57 +226,15 @@ MTS_INLINE Color<Float, 3> _srgb_to_xyz(const Color<Float, 3> &rgb) {
     return M * rgb;
 }
 
-#if !defined(MTS_VARIANT_TRANSIENT) || MTS_VARIANT_TRANSIENT
-
-/// Convert ITU-R Rec. BT.709 linear RGB to XYZ tristimulus values (Timed Remix)
+/// Convert XYZ tristimulus values to ITU-R Rec. BT.709 linear RGB
 template <typename Float>
-TimedColor<Float, 3> srgb_to_xyz(const TimedColor<Float, 3> &timed, mask_t<Float> /*active*/ = true) {
-    const Color<Float, 3> xyz = _srgb_to_xyz(timed.color());
-    return TimedColor<Float, 3>(xyz, timed.time());
-}
-
-#endif
-
-#if !defined(MTS_VARIANT_TRANSIENT) || !MTS_VARIANT_TRANSIENT
-
-/// Convert ITU-R Rec. BT.709 linear RGB to XYZ tristimulus values
-template <typename Float>
-Color<Float, 3> srgb_to_xyz(const Color<Float, 3> &rgb, mask_t<Float> /*active*/ = true) {
-    return _srgb_to_xyz(rgb);
-}
-
-#endif
-
-template <typename Float>
-MTS_INLINE Color<Float, 3> _xyz_to_srgb(const Color<Float, 3> &rgb) {
+Color<Float, 3> xyz_to_srgb(const Color<Float, 3> &rgb, mask_t<Float> /*active*/ = true) {
     using ScalarMatrix3f = enoki::Matrix<scalar_t<Float>, 3>;
     const ScalarMatrix3f M(3.240479f, -1.537150f, -0.498535f,
                           -0.969256f,  1.875991f,  0.041556f,
                            0.055648f, -0.204043f,  1.057311f);
     return M * rgb;
 }
-
-#if !defined(MTS_VARIANT_TRANSIENT) || MTS_VARIANT_TRANSIENT
-
-/// Convert ITU-R Rec. BT.709 linear RGB to XYZ tristimulus values (Timed Remix)
-template <typename Float>
-TimedColor<Float, 3> xyz_to_srgb(const TimedColor<Float, 3> &timed, mask_t<Float> /*active*/ = true) {
-    const Color<Float, 3> srgb = _xyz_to_srgb(timed.color());
-    return TimedColor<Float, 3>(srgb, timed.time());
-}
-
-#endif
-
-#if !defined(MTS_VARIANT_TRANSIENT) || !MTS_VARIANT_TRANSIENT
-
-/// Convert XYZ tristimulus values to ITU-R Rec. BT.709 linear RGB
-template <typename Float>
-Color<Float, 3> xyz_to_srgb(const Color<Float, 3> &rgb, mask_t<Float> /*active*/ = true) {
-    return _xyz_to_srgb(rgb);
-}
-
-#endif
-////////////////////////////////////////////////////////////////////////////////
 
 template <typename Float, size_t Size>
 Float luminance(const Spectrum<Float, Size> &value,

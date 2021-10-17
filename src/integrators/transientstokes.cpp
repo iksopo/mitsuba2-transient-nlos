@@ -43,8 +43,7 @@ public:
 
         if(aovsRecordVector.empty()) {
             for (const auto &result : radianceSamplesRecordVector) {
-                FloatTimeSample<Float, Mask> color(-1);
-                color.set_time(result.time, result.mask);
+                FloatTimeSample<Float, Mask> color(result.opl, result.mask);
                 if constexpr (is_polarized_v<Spectrum>) {
                     auto const &stokes = result.radiance.coeff(0);
                     for (int i = 3; i >= 0; --i) {

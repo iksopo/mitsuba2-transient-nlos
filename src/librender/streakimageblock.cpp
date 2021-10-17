@@ -101,7 +101,7 @@ StreakImageBlock<Float, Spectrum>::put(
     for (const auto &radianceSample : values) {
         Mask active = radianceSample.mask;
         // Convert t to bin
-        Float pos_sensor      = (radianceSample.time - m_time_offset) / m_exposure_time;
+        Float pos_sensor      = (radianceSample.opl - m_time_offset) / m_exposure_time;
         Int32 pos_sensor_int = floor2int<Int32>(pos_sensor);
 
         // Check if all sample values are valid

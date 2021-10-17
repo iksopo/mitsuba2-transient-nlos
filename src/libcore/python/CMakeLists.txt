@@ -18,12 +18,6 @@ foreach (MTS_VARIANT ${MTS_VARIANTS})
     set(MTS_VARIANT_VECTORIZE 0)
   endif()
 
-  if (MTS_VARIANT_SPECTRUM MATCHES "Timed")
-    set(MTS_VARIANT_TRANSIENT 1)
-  else()
-    set(MTS_VARIANT_TRANSIENT 0)
-  endif()
-
   add_mitsuba_python_library(${TARGET_NAME}
     main_v.cpp
     bbox_v.cpp
@@ -51,7 +45,6 @@ foreach (MTS_VARIANT ${MTS_VARIANTS})
     "-DMTS_VARIANT_FLOAT=${MTS_VARIANT_FLOAT}"
     "-DMTS_VARIANT_SPECTRUM=${MTS_VARIANT_SPECTRUM}"
     "-DMTS_VARIANT_VECTORIZE=${MTS_VARIANT_VECTORIZE}"
-    "-DMTS_VARIANT_TRANSIENT=${MTS_VARIANT_TRANSIENT}"
   )
 
   target_link_libraries(${TARGET_NAME} PRIVATE mitsuba-core tbb)

@@ -24,7 +24,6 @@ struct spectrum_traits<Color<Float, 1>> {
     static constexpr bool is_rgb             = false;
     static constexpr bool is_spectral        = false;
     static constexpr bool is_polarized       = false;
-    static constexpr bool is_transient       = false;
 };
 
 template <typename Float>
@@ -36,19 +35,6 @@ struct spectrum_traits<Color<Float, 3>> {
     static constexpr bool is_rgb             = true;
     static constexpr bool is_spectral        = false;
     static constexpr bool is_polarized       = false;
-    static constexpr bool is_transient       = false;
-};
-
-template <typename Float>
-struct spectrum_traits<TimedColor<Float, 3>> {
-    using Scalar                             = TimedColor<scalar_t<Float>, 3>;
-    using Wavelength                         = Color<Float, 0>;
-    using Unpolarized                        = TimedColor<Float, 3>;
-    static constexpr bool is_monochromatic   = false;
-    static constexpr bool is_rgb             = true;
-    static constexpr bool is_spectral        = false;
-    static constexpr bool is_polarized       = false;
-    static constexpr bool is_transient       = true;
 };
 
 template <typename Float, size_t Size>
@@ -60,7 +46,6 @@ struct spectrum_traits<Spectrum<Float, Size>> {
     static constexpr bool is_rgb             = false;
     static constexpr bool is_spectral        = true;
     static constexpr bool is_polarized       = false;
-    static constexpr bool is_transient       = false;
 };
 
 template <typename T>
@@ -68,7 +53,6 @@ struct spectrum_traits<MuellerMatrix<T>> : spectrum_traits<T> {
     using Scalar                             = MuellerMatrix<typename spectrum_traits<T>::Scalar>;
     using Unpolarized                        = T;
     static constexpr bool is_polarized       = true;
-    static constexpr bool is_transient       = false;
 };
 
 template <>
@@ -91,7 +75,6 @@ template <typename T> constexpr bool is_monochromatic_v = detail::spectrum_trait
 template <typename T> constexpr bool is_rgb_v = detail::spectrum_traits<T>::is_rgb;
 template <typename T> constexpr bool is_spectral_v = detail::spectrum_traits<T>::is_spectral;
 template <typename T> constexpr bool is_polarized_v = detail::spectrum_traits<T>::is_polarized;
-template <typename T> constexpr bool is_transient_v = detail::spectrum_traits<T>::is_transient;
 template <typename T> using scalar_spectrum_t = typename detail::spectrum_traits<T>::Scalar;
 template <typename T> using wavelength_t = typename detail::spectrum_traits<T>::Wavelength;
 template <typename T> using depolarize_t = typename detail::spectrum_traits<T>::Unpolarized;
@@ -124,10 +107,6 @@ template <typename T> struct underlying<enoki::detail::MaskedArray<T>> {
 
 template <typename T, size_t Size> struct underlying<Color<T, Size>> {
     using type = Color<typename underlying<T>::type, Size>;
-};
-
-template <typename T, size_t Size> struct underlying<TimedColor<T, Size>> {
-    using type = TimedColor<typename underlying<T>::type, Size>;
 };
 
 template <typename T, size_t Size> struct underlying<Spectrum<T, Size>> {
