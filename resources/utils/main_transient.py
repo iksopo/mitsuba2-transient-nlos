@@ -8,6 +8,7 @@ import cv2 as cv
 import mitsuba
 
 from tonemapper import *
+from tqdm import tqdm
 
 mitsuba.set_variant("scalar_rgb")
 
@@ -48,15 +49,16 @@ def read_streakimg_mitsuba(dir: str, extension: str = "exr") -> np.array:
     """
     from mitsuba.core import Bitmap, Struct, float_dtype
     number_of_xtframes = len(glob.glob(f"{dir}/frame_*.{extension}"))
-    fileList = []
-    for i_xtframe in range(number_of_xtframes):
-        other = Bitmap(f"{dir}/frame_{i_xtframe}.{extension}")
-        #     .convert(Bitmap.PixelFormat.RGBA, Struct.Type.Float32, srgb_gamma=False)
-        img = np.array(other, copy=False)
-        fileList.append(np.expand_dims(img, axis=0))
+    first_img = np.array(Bitmap(f"{dir}/frame_0.{extension}"), copy=False)
+    streak_img = np.empty((number_of_xtframes, *first_img.shape), dtype=first_img.dtype)
+    with tqdm(total=number_of_xtframes, ascii=True) as pbar:
+        for i_xtframe in range(number_of_xtframes):
+            other = Bitmap(f"{dir}/frame_{i_xtframe}.{extension}")
+            #     .convert(Bitmap.PixelFormat.RGBA, Struct.Type.Float32, srgb_gamma=False)
+            streak_img[i_xtframe] = np.nan_to_num(np.array(other, copy=False), nan=0.)
+            pbar.update(1)
 
-    streak_img = np.concatenate(fileList)
-    return np.nan_to_num(streak_img, nan=0.)
+    return streak_img
 
 
 def streakimg2steadyimg(streakimg: np.array) -> np.array:
@@ -103,9 +105,10 @@ def write_video_custom(streakimg_ldr: np.array, filename: str):
     # 1. Get the streak image (already done) and define the output
     writer = imageio.get_writer(filename + ".mp4", fps=10)
     # 2. Iterate over the streak img frames
-    for i in range(number_of_frames):
-        writer.append_data((streakimg_ldr[:, :, i, :3] * 255).astype(np.uint8))
-        print(f"{i}/{number_of_frames}", end="\r")
+    with tqdm(total=number_of_frames, ascii=True) as pbar:
+        for i in range(number_of_frames):
+            writer.append_data((streakimg_ldr[:, :, i, :3] * 255).astype(np.uint8))
+            pbar.update(1)
     # 3. Write the video
     writer.close()
 
@@ -168,6 +171,10 @@ if __name__ == "__main__":
     print("Loading streak image")
     path_streak_img = args.dir + "/" + args.file_streak_image
     streakimg = read_streakimg_mitsuba(path_streak_img, extension=args.extension)
+
+    # NOTE(diego): lower memory usage, similar results
+    streakimg = streakimg.astype(np.float16)
+
     streakimg = streakimg[:, :, :, :3]  # drop alpha
     streakimg_acc = streakimg2steadyimg(streakimg)
     streakimg_acc = streakimg_acc[:, :, :3]  # drop alpha
