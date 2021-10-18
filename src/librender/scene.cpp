@@ -100,6 +100,10 @@ MTS_VARIANT Scene<Float, Spectrum>::Scene(const Properties &props) {
     for (Emitter *emitter: m_emitters)
         emitter->set_scene(this);
 
+    // NOTE(diego): set scene for sensors, needed by NLOSCaptureSensor
+    for (Sensor *sensor: m_sensors)
+        sensor->set_scene(this);
+
     m_shapes_grad_enabled = false;
 }
 
