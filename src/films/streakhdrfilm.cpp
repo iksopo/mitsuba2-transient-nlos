@@ -69,8 +69,8 @@ High dynamic range streak film (:monosp:`streakhdrfilm`)
 template <typename Float, typename Spectrum>
 class StreakHDRFilm final : public StreakFilm<Float, Spectrum> {
 public:
-    MTS_IMPORT_BASE(StreakFilm, m_size, m_crop_size, m_crop_offset, m_time,
-                    m_exposure_time, m_time_offset, m_high_quality_edges,
+    MTS_IMPORT_BASE(StreakFilm, m_size, m_crop_size, m_crop_offset, m_num_bins,
+                    m_bin_width_opl, m_start_opl, m_high_quality_edges,
                     m_filter, m_time_filter)
     MTS_IMPORT_TYPES(ReconstructionFilter, StreakImageBlock, ImageBlock)
 
@@ -172,9 +172,9 @@ public:
         }
 
         m_storage = new StreakImageBlock(m_crop_size,
-                                         m_time,
-                                         m_exposure_time,
-                                         m_time_offset,
+                                         m_num_bins,
+                                         m_bin_width_opl,
+                                         m_start_opl,
                                          channels.size());
         m_storage->set_offset(m_crop_offset);
         m_storage->clear();
@@ -474,12 +474,12 @@ public:
     std::string to_string() const override {
         std::ostringstream oss;
         oss << "StreakHDRFilm[" << std::endl
-            << "  size = " << m_size        << "," << std::endl
-            << "  crop_size = " << m_crop_size   << "," << std::endl
+            << "  size = " << m_size << "," << std::endl
+            << "  crop_size = " << m_crop_size << "," << std::endl
             << "  crop_offset = " << m_crop_offset << "," << std::endl
-            << "  time = "        << m_time        << "," << std::endl
-            << "  exposure_time = " << m_exposure_time << "," << std::endl
-            << "  time_offset = "      << m_time_offset      << "," << std::endl
+            << "  num_bins = " << m_num_bins << "," << std::endl
+            << "  bin_width_opl = " << m_bin_width_opl << "," << std::endl
+            << "  start_opl = " << m_start_opl << "," << std::endl
             << "  high_quality_edges = " << m_high_quality_edges << "," << std::endl
             << "  filter = " << m_filter << std::endl
             << "  time_filter = " << m_time_filter << std::endl

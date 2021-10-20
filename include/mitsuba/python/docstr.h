@@ -5888,25 +5888,25 @@ static const char *__doc_mitsuba_StreakFilm_bitmap = R"doc()doc";
 
 static const char *__doc_mitsuba_StreakFilm_class = R"doc()doc";
 
-static const char *__doc_mitsuba_StreakFilm_exposure_time = R"doc()doc";
+static const char *__doc_mitsuba_StreakFilm_bin_width_opl = R"doc()doc";
 
 static const char *__doc_mitsuba_StreakFilm_getStreakImageBlock = R"doc()doc";
 
-static const char *__doc_mitsuba_StreakFilm_m_exposure_time = R"doc()doc";
+static const char *__doc_mitsuba_StreakFilm_m_bin_width_opl = R"doc()doc";
 
-static const char *__doc_mitsuba_StreakFilm_m_time = R"doc()doc";
+static const char *__doc_mitsuba_StreakFilm_m_num_bins = R"doc()doc";
 
 static const char *__doc_mitsuba_StreakFilm_m_time_filter = R"doc()doc";
 
-static const char *__doc_mitsuba_StreakFilm_m_time_offset = R"doc()doc";
+static const char *__doc_mitsuba_StreakFilm_m_start_opl = R"doc()doc";
 
 static const char *__doc_mitsuba_StreakFilm_put =
 R"doc(Merge an image block into the film. This methods should be thread-
 safe.)doc";
 
-static const char *__doc_mitsuba_StreakFilm_time = R"doc(//! @{ \name Accessor functions)doc";
+static const char *__doc_mitsuba_StreakFilm_num_bins = R"doc(//! @{ \name Accessor functions)doc";
 
-static const char *__doc_mitsuba_StreakFilm_time_offset = R"doc()doc";
+static const char *__doc_mitsuba_StreakFilm_start_opl = R"doc()doc";
 
 static const char *__doc_mitsuba_StreakFilm_time_reconstruction_filter = R"doc()doc";
 

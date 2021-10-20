@@ -199,7 +199,9 @@ struct SurfaceInteraction : Interaction<Float_, Spectrum_> {
                                      shape->interior_medium());
     }
 
-    // TODO: fill the description
+    /**
+     * \brief Distance from the ray origin to the intersection point in the surface
+     */
     Float distance(const Ray3f &ray) const {
         return norm(p - ray.o);
     }

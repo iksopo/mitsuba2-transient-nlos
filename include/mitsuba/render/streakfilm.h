@@ -22,9 +22,6 @@ public:
     MTS_IMPORT_TYPES(ImageBlock, StreakImageBlock, ReconstructionFilter)
 
     /// Merge an image block into the film. This methods should be thread-safe.
-    // void put(const ImageBlock *block) override;
-
-    /// Merge an image block into the film. This methods should be thread-safe.
     virtual void put(const StreakImageBlock *block) = 0;
 
     /// Return the bitmap object storing the developed contents of the film corresponding to the i-th slice x-t
@@ -34,11 +31,13 @@ public:
     //! @{ \name Accessor functions
     // =============================================================
 
-    size_t time() const { return m_time; }
+    size_t num_bins() const { return m_num_bins; }
 
-    float exposure_time() const { return m_exposure_time; }
+    float bin_width_opl() const { return m_bin_width_opl; }
 
-    float time_offset() const { return m_time_offset; }
+    float start_opl() const { return m_start_opl; }
+
+    Float end_opl() const { return start_opl() + num_bins() * bin_width_opl(); }
 
     const ReconstructionFilter *time_reconstruction_filter() const {
         return m_time_filter.get();
@@ -61,9 +60,9 @@ protected:
     virtual ~StreakFilm();
 
 protected:
-    uint32_t m_time; // TODO: look for better naming: frames, length, etc ..
-    float m_exposure_time; // TODO: look for better naming: exposure_per_frame, ...
-    float m_time_offset; // TODO: look for more uniformity in m_time, m_exposure_time and m_offset
+    uint32_t m_num_bins;
+    float m_bin_width_opl;
+    float m_start_opl;
     ref<ReconstructionFilter> m_time_filter;
 };
 

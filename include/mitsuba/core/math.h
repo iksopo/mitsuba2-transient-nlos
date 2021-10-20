@@ -13,6 +13,7 @@ NAMESPACE_BEGIN(math)
 //! @{ \name Useful constants in various precisions
 // -----------------------------------------------------------------------
 
+template <typename T> constexpr auto SpeedOfLight    = scalar_t<T>(299792458.0);
 template <typename T> constexpr auto E               = scalar_t<T>(2.71828182845904523536);
 template <typename T> constexpr auto Pi              = scalar_t<T>(3.14159265358979323846);
 template <typename T> constexpr auto TwoPi           = scalar_t<T>(6.28318530717958647692);

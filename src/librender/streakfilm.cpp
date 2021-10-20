@@ -5,9 +5,11 @@
 NAMESPACE_BEGIN(mitsuba)
 
 MTS_VARIANT StreakFilm<Float, Spectrum>::StreakFilm(const Properties &props) : Base(props) {
-    m_time = props.int_("time", 1000);
-    m_exposure_time = props.float_("exposure_time", 1);
-    m_time_offset = props.float_("time_offset", 0);
+    // NOTE(diego): old names are included for compatibility with old files
+    m_num_bins = props.int_("num_bins", props.int_("time", 1000));
+    m_bin_width_opl =
+        props.float_("bin_width_opl", props.float_("exposure_time", 1));
+    m_start_opl = props.float_("start_opl", props.float_("time_offset", 0));
 
     // Use the provided reconstruction filter, if any.
     for (auto &[name, obj] : props.objects(false)) {
@@ -39,12 +41,12 @@ MTS_VARIANT StreakFilm<Float, Spectrum>::~StreakFilm() {}
 MTS_VARIANT std::string StreakFilm<Float, Spectrum>::to_string() const {
     std::ostringstream oss;
     oss << "StreakFilm[" << std::endl
-        << "  size = "        << m_size        << "," << std::endl
-        << "  crop_size = "   << m_crop_size   << "," << std::endl
+        << "  size = " << m_size << "," << std::endl
+        << "  crop_size = " << m_crop_size << "," << std::endl
         << "  crop_offset = " << m_crop_offset << "," << std::endl
-        << "  time = "        << m_time        << "," << std::endl
-        << "  exposure_time = " << m_exposure_time << "," << std::endl
-        << "  time_offset = "      << m_time_offset      << "," << std::endl
+        << "  num_bins = " << m_num_bins << "," << std::endl
+        << "  bin_width_opl = " << m_bin_width_opl << "," << std::endl
+        << "  start_opl = " << m_start_opl << "," << std::endl
         << "  high_quality_edges = " << m_high_quality_edges << "," << std::endl
         << "  filter = " << m_filter << std::endl
         << "  time_filter = " << m_time_filter << std::endl

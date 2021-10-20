@@ -117,9 +117,9 @@ MTS_VARIANT bool TransientSamplingIntegrator<Float, Spectrum>::render(Scene *sce
                 ScopedSetThreadEnvironment set_env(env);
                 ref<Sampler> sampler = sensor->sampler()->clone();
                 ref<StreakImageBlock> block = new StreakImageBlock(m_block_size,
-                                                       film->time(),
-                                                       film->exposure_time(),
-                                                       film->time_offset(),
+                                                       film->num_bins(),
+                                                       film->bin_width_opl(),
+                                                       film->start_opl(),
                                                        channels.size(),
                                                        film->reconstruction_filter(),
                                                        film->time_reconstruction_filter(),
@@ -131,8 +131,7 @@ MTS_VARIANT bool TransientSamplingIntegrator<Float, Spectrum>::render(Scene *sce
                 for (auto i = range.begin(); i != range.end() && !should_stop(); ++i) {
                     auto [offset, size, block_id] = spiral.next_block();
                     Assert(hprod(size) != 0);
-                    // TODO: look where does time come from
-                    block->set_size(size, film->time());
+                    block->set_size(size, film->num_bins());
                     block->set_offset(offset);
 
                     std::vector<FloatTimeSample<Float, Mask>> aovsRecordVector;
@@ -165,9 +164,9 @@ MTS_VARIANT bool TransientSamplingIntegrator<Float, Spectrum>::render(Scene *sce
             idx /= (uint32_t) samples_per_pass;
 
         ref<StreakImageBlock> block = new StreakImageBlock(m_block_size,
-                                                           film->time(),
-                                                           film->exposure_time(),
-                                                           film->time_offset(),
+                                                           film->num_bins(),
+                                                           film->bin_width_opl(),
+                                                           film->start_opl(),
                                                            channels.size(),
                                                            film->reconstruction_filter(),
                                                            film->time_reconstruction_filter(),
@@ -258,7 +257,7 @@ TransientSamplingIntegrator<Float, Spectrum>::render_sample(const Scene *scene,
                                                    const Sensor *sensor,
                                                    Sampler *sampler,
                                                    StreakImageBlock *block,
-                                                   std::vector<FloatTimeSample<Float, Mask>> &aovsRecordVector,
+                                                   std::vector<FloatTimeSample<Float, Mask>> &aovs_record,
                                                    const Vector2f &pos,
                                                    ScalarFloat diff_scale_factor,
                                                    Mask active) const {
@@ -268,9 +267,16 @@ TransientSamplingIntegrator<Float, Spectrum>::render_sample(const Scene *scene,
     if (sensor->needs_aperture_sample())
         aperture_sample = sampler->next_2d(active);
 
-    Float time = sensor->shutter_open();
-    if (sensor->shutter_open_time() > 0.f)
-        time += sampler->next_1d(active) * sensor->shutter_open_time();
+    if (sensor->shutter_open() != 0.f || sensor->shutter_open_time() != 0.f)
+        Log(Warn, "Shutter open/close time is not set to zero. Ignoring.");
+
+    Float max_opl = math::Infinity<Float>;
+    const auto *streak_film = dynamic_cast<const StreakFilm *>(sensor->film());
+    if (streak_film)
+        max_opl = streak_film->end_opl();
+    else
+        Log(Warn, "Cannot determine maximum/end optical path length. Are you "
+                  "using a Transient Integrator without a Streak Film?");
 
     Float wavelength_sample = sampler->next_1d(active);
 
@@ -279,14 +285,14 @@ TransientSamplingIntegrator<Float, Spectrum>::render_sample(const Scene *scene,
         sensor->film()->crop_size();
 
     auto [ray, ray_weight] = sensor->sample_ray_differential(
-        time, wavelength_sample, adjusted_position, aperture_sample);
+        0.f, wavelength_sample, adjusted_position, aperture_sample);
 
     ray.scale_differential(diff_scale_factor);
 
     const Medium *medium = sensor->medium();
-    std::vector<RadianceSample<Float, Spectrum, Mask>> radianceSamplesRecordVector;
-    // TODO: look if aovs + 5 is a in/out parameter for a single sample, because in that case now it does not work
-    sample(scene, sampler, ray, medium, aovsRecordVector, active, radianceSamplesRecordVector);
+    std::vector<RadianceSample<Float, Spectrum, Mask>> timed_samples_record;
+    // TODO(jorge): look if aovs + 5 is a in/out parameter for a single sample, because in that case now it does not work
+    sample(scene, sampler, ray, medium, aovs_record, timed_samples_record, max_opl, active);
 
     /**
     // Si lo sumo aquí, va bien y la foto tiene sentido
@@ -299,7 +305,7 @@ TransientSamplingIntegrator<Float, Spectrum>::render_sample(const Scene *scene,
      **/
 
     std::vector<RadianceSample<Float, UnpolarizedSpectrum, Mask>> radianceSampleVector_u = {};
-    for(const auto &radianceSampleRecord : radianceSamplesRecordVector) {
+    for(const auto &radianceSampleRecord : timed_samples_record) {
         radianceSampleVector_u.emplace_back(
             radianceSampleRecord.opl,
             depolarize(radianceSampleRecord.radiance * ray_weight),
@@ -350,9 +356,9 @@ TransientSamplingIntegrator<Float, Spectrum>::render_sample(const Scene *scene,
     // aovs and the aov vector is empty or the integrator produces aovs and
     // there are as many aov samples as radiance samples (one aov sample for
     // each radiance sample)
-    assert(aovsRecordVector.empty() ||
-           (aovsRecordVector.size() == radianceSamplesRecordVector.size()));
-    if(aovsRecordVector.empty()) {
+    assert(aovs_record.empty() ||
+           (aovs_record.size() == timed_samples_record.size()));
+    if(aovs_record.empty()) {
         for(const auto &xyzRecord: xyzVector) {
             FloatTimeSample<Float, Mask> color(xyzRecord.opl, xyzRecord.mask);
             // Reversed
@@ -361,15 +367,15 @@ TransientSamplingIntegrator<Float, Spectrum>::render_sample(const Scene *scene,
             color.push_front(xyzRecord.radiance.z());
             color.push_front(xyzRecord.radiance.y());
             color.push_front(xyzRecord.radiance.x());
-            aovsRecordVector.push_back(color);
+            aovs_record.push_back(color);
         }
     } else {
-        for (int i = 0; i < aovsRecordVector.size(); ++i) {
-            aovsRecordVector[i].push_front(1.f);
-            aovsRecordVector[i].push_front(select(xyzVector[i].mask, Float(1.f), Float(0.f)));
-            aovsRecordVector[i].push_front(xyzVector[i].radiance.z());
-            aovsRecordVector[i].push_front(xyzVector[i].radiance.y());
-            aovsRecordVector[i].push_front(xyzVector[i].radiance.x());
+        for (int i = 0; i < aovs_record.size(); ++i) {
+            aovs_record[i].push_front(1.f);
+            aovs_record[i].push_front(select(xyzVector[i].mask, Float(1.f), Float(0.f)));
+            aovs_record[i].push_front(xyzVector[i].radiance.z());
+            aovs_record[i].push_front(xyzVector[i].radiance.y());
+            aovs_record[i].push_front(xyzVector[i].radiance.x());
         }
     }
 
@@ -384,7 +390,7 @@ TransientSamplingIntegrator<Float, Spectrum>::render_sample(const Scene *scene,
         values.emplace_back(xyzRecord.opl, color, xyzRecord.mask);
     }
 
-    block->put(position_sample, aovsRecordVector);
+    block->put(position_sample, aovs_record);
 
     /**
     radiance.first = ray_weight * radiance.first;
@@ -418,9 +424,10 @@ TransientSamplingIntegrator<Float, Spectrum>::sample(const Scene * /* scene */,
                                             Sampler * /* sampler */,
                                             const RayDifferential3f & /* ray */,
                                             const Medium * /* medium */,
-                                            std::vector<FloatTimeSample<Float, Mask>> & /* aovs */,
-                                            Mask /* active */,
-                                            std::vector<RadianceSample<Float, Spectrum, Mask>> & /* radianceSamplesRecordVector */) const {
+                                            std::vector<FloatTimeSample<Float, Mask>> & /* aovs_record */,
+                                            std::vector<RadianceSample<Float, Spectrum, Mask>> & /* timed_samples_record */,
+                                            Float /* max_path_opl */,
+                                            Mask /* active */) const {
     NotImplementedError("sample");
 }
 

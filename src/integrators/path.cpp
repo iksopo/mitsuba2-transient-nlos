@@ -121,6 +121,14 @@ public:
         Mask valid_ray = si.is_valid();
         EmitterPtr emitter = si.emitter(scene);
 
+        // NOTE(diego): useful to debug NLOSCaptureMeter,
+        //              these lines can be removed safely
+        // Float r = (si.p.x() + 1.0f) * 127.5f;
+        // Float g = (si.p.y() + 1.0f) * 127.5f;
+        // Float b = 0.f; // (si.p.z() + 1.0f) * 127.5f;
+        // std::cerr << r << " " << g << " " << b << std::endl;
+        // return std::make_pair(Color3f(r, g, b), true);
+
         for (int depth = 1;; ++depth) {
 
             // ---------------- Intersection with emitters ----------------

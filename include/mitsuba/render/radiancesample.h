@@ -7,8 +7,6 @@
 
 NAMESPACE_BEGIN(mitsuba)
 
-#define MTS_SPEED_OF_LIGHT 299792458.0f
-
 /**
  * \brief Spectrum container with additional time information. Whereas standard
  * integrators return a `std::pair<Spectrum, Mask>`, transient integrators
@@ -33,8 +31,8 @@ struct MTS_EXPORT_RENDER RadianceSample {
         opl += distance * medium_eta;
     }
 
-    decltype(auto) time() const { return opl / MTS_SPEED_OF_LIGHT; }
-    decltype(auto) time() { return opl / MTS_SPEED_OF_LIGHT; }
+    decltype(auto) time() const { return opl / math::SpeedOfLight<Float>; }
+    decltype(auto) time() { return opl / math::SpeedOfLight<Float>; }
 };
 
 /**
@@ -54,8 +52,8 @@ struct MTS_EXPORT_RENDER FloatTimeSample {
 
     void push_front(Float value) { values.push_front(value); }
 
-    decltype(auto) time() const { return opl / MTS_SPEED_OF_LIGHT; }
-    decltype(auto) time() { return opl / MTS_SPEED_OF_LIGHT; }
+    decltype(auto) time() const { return opl / math::SpeedOfLight<Float>; }
+    decltype(auto) time() { return opl / math::SpeedOfLight<Float>; }
 };
 
 NAMESPACE_END(mitsuba)

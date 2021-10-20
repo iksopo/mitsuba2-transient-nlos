@@ -90,23 +90,23 @@ public:
      *    If the ray is inside a medium, this parameter holds a pointer to that
      *    medium
      *
-     * \param active
-     *    A mask that indicates which SIMD lanes are active
-     *
-     * \param aovsRecordVector
+     * \param aovs_record
      *    Integrators may return a list with one or more arbitrary output
      *    variables (AOVs) for each sample via this parameter. If \c nullptr is
      *    provided to this argument, no AOVs should be returned. Otherwise, the
      *    caller guarantees that space for at least <tt>aov_names().size()</tt>
      *    entries has been allocated.
      *
-     * \param radianceSamplesRecordVector
+     * \param timed_samples_record
      *    Integrator must return a list of samples containing a spectrum and a mask
      *    specifying whether a surface or medium interaction was sampled.
      *    False mask entries indicate that the ray "escaped" the scene, in
      *    which case the the returned spectrum contains the contribution of
      *    environment maps, if present. The mask can be used to estimate a
      *    suitable alpha channel of a rendered image.
+     *
+     * \param active
+     *    A mask that indicates which SIMD lanes are active
      *
      * \remark
      *    In the Python bindings, this function returns the \c aov output
@@ -120,9 +120,10 @@ public:
                         Sampler *sampler,
                         const RayDifferential3f &ray,
                         const Medium *medium = nullptr,
-                        std::vector<FloatTimeSample<Float, Mask>> &aovsRecordVector = {},
-                        Mask active = true,
-                        std::vector<RadianceSample<Float, Spectrum, Mask>> &radianceSamplesRecordVector = {}) const;
+                        std::vector<FloatTimeSample<Float, Mask>> &aovs_record = {},
+                        std::vector<RadianceSample<Float, Spectrum, Mask>> &timed_samples_record = {},
+                        Float max_path_opl = math::Infinity<Float>,
+                        Mask active = true) const;
 
     /**
      * For integrators that return one or more arbitrary output variables
@@ -223,33 +224,6 @@ protected:
     int m_max_depth;
     int m_rr_depth;
 };
-
-/**
- * Returns the (normalized) time it takes the light to traverse that distance in
- * vacuum (in meters).
- *
- * If it returned the time (without normalization), the result should be equal
- * to distance/c (in seconds), where c is the light velocity in the vacuum
- * in m/s.
- * However, the value c is very big (around 3e8) and the result of dividing
- * distance by c would be usually very small, which could cause cause numerical
- * problems. For this reason, this time of flight (without normalization) is
- * normalized by c again, which effectively means to return the distance:
- * (distance/c)*normalization_factor = (distance/c)*c = distance.
- *
- * In order to calculate the time of flight in other medium other than vacuum,
- * it is needed to multiply time of flight times the index of refraction of that
- * medium. This will return the (normalized) time it takes the light to traverse
- * that distance in that medium (in meters because the time of flight is
- * normalized as explained before) or also known as optical distance.
- *
- * @param distance
- * @return normalized time of flight
- */
-template <typename Float>
-inline Float time_of_flight(Float distance) {
-    return distance;
-}
 
 MTS_EXTERN_CLASS_RENDER(TransientIntegrator)
 MTS_EXTERN_CLASS_RENDER(TransientSamplingIntegrator)

@@ -25,24 +25,26 @@ public:
             Throw("Must specify a sub-integrator!");
     }
 
-    void sample(const Scene *scene, Sampler *sampler, const RayDifferential3f &ray,
-                const Medium * medium,
-                std::vector<FloatTimeSample<Float, Mask>> & aovsRecordVector,
-                Mask active,
-                std::vector<RadianceSample<Float, Spectrum, Mask>> &radianceSamplesRecordVector) const override {
+    void sample(const Scene *scene, Sampler *sampler,
+                const RayDifferential3f &ray, const Medium *medium,
+                std::vector<FloatTimeSample<Float, Mask>> &aovs_record,
+                std::vector<RadianceSample<Float, Spectrum, Mask>>
+                    &timed_samples_record,
+                Float max_path_opl, Mask active) const override {
         MTS_MASKED_FUNCTION(ProfilerPhase::SamplingIntegratorSample, active);
 
-        m_integrator->sample(scene, sampler, ray, medium, aovsRecordVector, active, radianceSamplesRecordVector);
+        m_integrator->sample(scene, sampler, ray, medium, aovs_record,
+                             timed_samples_record, max_path_opl, active);
 
         // Either there are no aovs samples because the m_integrator does not produce
         // aovs and the aov vector is empty or the integrator produces aovs and
         // there are as many aov samples as radiance samples (one aov sample for
         // each radiance sample)
-        assert(aovsRecordVector.empty() ||
-               (aovsRecordVector.size() == radianceSamplesRecordVector.size()));
+        assert(aovs_record.empty() ||
+               (aovs_record.size() == timed_samples_record.size()));
 
-        if(aovsRecordVector.empty()) {
-            for (const auto &result : radianceSamplesRecordVector) {
+        if(aovs_record.empty()) {
+            for (const auto &result : timed_samples_record) {
                 FloatTimeSample<Float, Mask> color(result.opl, result.mask);
                 if constexpr (is_polarized_v<Spectrum>) {
                     auto const &stokes = result.radiance.coeff(0);
@@ -69,12 +71,12 @@ public:
                         color.push_front(rgb.r());
                     }
                 }
-                aovsRecordVector.push_back(color);
+                aovs_record.push_back(color);
             }
         } else {
-            for (int i = 0; i < aovsRecordVector.size(); ++i) {
+            for (int i = 0; i < aovs_record.size(); ++i) {
                 if constexpr (is_polarized_v<Spectrum>) {
-                    auto const &stokes = radianceSamplesRecordVector[i].radiance.coeff(0);
+                    auto const &stokes = timed_samples_record[i].radiance.coeff(0);
                     for (int i = 3; i >= 0; --i) {
                         Color3f rgb;
                         if constexpr (is_monochromatic_v<Spectrum>) {
@@ -93,9 +95,9 @@ public:
                         }
 
                         // Reversed
-                        aovsRecordVector[i].push_front(rgb.b());
-                        aovsRecordVector[i].push_front(rgb.g());
-                        aovsRecordVector[i].push_front(rgb.r());
+                        aovs_record[i].push_front(rgb.b());
+                        aovs_record[i].push_front(rgb.g());
+                        aovs_record[i].push_front(rgb.r());
                     }
                 }
             }

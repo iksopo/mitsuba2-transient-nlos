@@ -5,6 +5,7 @@
 #include <mitsuba/core/warp.h>
 #include <mitsuba/render/emitter.h>
 #include <mitsuba/render/fwd.h>
+#include <mitsuba/render/ior.h>
 #include <mitsuba/render/scene.h>
 #include <mitsuba/render/sensor.h>
 
@@ -35,9 +36,11 @@ children:
 
  * A `film`, which will decide the distribution of the sensor measurements.
    Points on the <tt>[0,1]^2</tt> domain are divided into `width * height`
-   (think of it as the pixels of a 2D image). The sensor will sample the center
-   of each of these pixels. A `box` reconstruction filter should likely be used,
-   with the `high_quality_edges` option turned off.
+   (think of it as the pixels of a 2D image) which will be sampled as positions
+   in the replay `shape` (the `rectangle` shape has good behaviour for planar
+   walls). The sensor will sample the center of each of these pixels. A `box`
+   reconstruction filter should likely be used, with the `high_quality_edges`
+   option turned off.
  * A `emitter` (likely a projector with small field of view, to simulate a
    laser) which will be positioned and pointed as specified by `laser_origin`
    and `laser_lookat_pixel`
@@ -49,6 +52,8 @@ children:
    film in a plane, a laser pointed to (7.5, 15.5) will point to the middle of
    the plane. Note that the X, Y coordinates are 0-indexed and the Z coordinate
    should be 0.
+ * `account_first_and_last_bounces`: If false, the time it takes for light
+   to travel (laser --> relay wall + relay_wall --> sensor) is substracted.
 
 .. code-block:: xml
     :name: nlos-meter-example
@@ -56,6 +61,7 @@ children:
     <shape type="plane">
         <sensor type="nloscapturemeter">
             <!-- sampler -->
+            <boolean name="account_first_and_last_bounces" value="false"/>
             <point name="sensor_origin" x="1" y="0" z="0" />
             <point name="laser_origin" x="1" y="0" z="0" />
             <point name="laser_lookat_pixel" x="9" y="15" z="0" />
@@ -90,6 +96,9 @@ public:
                 props.mark_queried(name);
             }
         }
+
+        m_account_first_and_last_bounces =
+            props.bool_("account_first_and_last_bounces", true);
 
         // Update the to_world transform if origin is also provided
         // NOTE(diego): const_cast bad, don't care
@@ -141,7 +150,12 @@ private:
         const_cast<AnimatedTransform *>(m_emitter->world_transform())
             ->append(0.f, Transform4f::look_at(m_laser_origin, laser_target,
                                                Vector3f(0.f, 1.f, 0.f)));
+
+        m_laser_bounce_opl =
+            norm(laser_target - m_laser_origin) * lookup_ior("air");
     }
+
+    // TODO(diego): traverse function?
 
 private:
     std::pair<uint, uint> film_size() const {
@@ -159,8 +173,8 @@ private:
                         (pixel.y() + 0.5f) / film_height };
     }
 
-    Vector3f sample_direction(Float time, const Point2f &sample,
-                              Mask active) const {
+    std::pair<Float, Vector3f>
+    sample_direction(Float time, const Point2f &sample, Mask active) const {
         Point3f origin = sensor_origin(time, active);
 
         auto [film_width, film_height] = film_size();
@@ -171,7 +185,10 @@ private:
             floor(sample.x() * film_width), floor(sample.y() * film_height) });
         Point3f target = m_shape->sample_position(time, grid_sample, active).p;
 
-        return normalize(target - origin);
+        Vector3f direction = target - origin;
+        Float distance     = norm(direction);
+        direction /= distance;
+        return std::make_pair(distance, direction);
     }
 
 public:
@@ -181,11 +198,15 @@ public:
 
         MTS_MASKED_FUNCTION(ProfilerPhase::EndpointSampleRay, active);
 
-        Point3f origin     = sensor_origin(time, active);
-        Vector3f direction = sample_direction(time, sample2, active);
+        Point3f origin = sensor_origin(time, active);
+        auto [sensor_distance, direction] =
+            sample_direction(time, sample2, active);
 
         auto [wavelengths, wav_weight] =
             sample_wavelength<Float, Spectrum>(wavelength_sample);
+
+        if (!m_account_first_and_last_bounces)
+            time -= m_laser_bounce_opl + sensor_distance * lookup_ior("air");
 
         return std::make_pair(
             RayDifferential3f(origin, direction, time, wavelengths),
@@ -231,6 +252,8 @@ private:
     ref<Emitter> m_emitter;
     Point3f m_laser_origin;
     Point2f m_target_lookat_sample;
+    bool m_account_first_and_last_bounces;
+    Float m_laser_bounce_opl;
 };
 
 MTS_IMPLEMENT_CLASS_VARIANT(NLOSCaptureMeter, Sensor)

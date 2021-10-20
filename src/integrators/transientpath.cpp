@@ -1,6 +1,7 @@
 #include <enoki/stl.h>
 #include <mitsuba/core/properties.h>
 #include <mitsuba/core/ray.h>
+#include <mitsuba/render/ior.h>
 #include <mitsuba/render/bsdf.h>
 #include <mitsuba/render/emitter.h>
 #include <mitsuba/render/records.h>
@@ -19,33 +20,41 @@ public:
 
     void sample(const Scene *scene, Sampler *sampler, const RayDifferential3f &ray_,
                 const Medium * /* medium */,
-                std::vector<FloatTimeSample<Float, Mask>> & /* aovs */,
-                Mask active,
-                std::vector<RadianceSample<Float, Spectrum, Mask>> &radianceSamplesRecordVector) const override {
+                std::vector<FloatTimeSample<Float, Mask>> & /* aovs_record */,
+                std::vector<RadianceSample<Float, Spectrum, Mask>> &timed_samples_record,
+                Float max_path_opl,
+                Mask active) const override {
         MTS_MASKED_FUNCTION(ProfilerPhase::SamplingIntegratorSample, active);
 
         RayDifferential3f ray = ray_;
 
-        // Tracks radiance scaling due to index of refraction changes
-        Float eta(1.f);
+        // Index of refraction of the current medium (used for OPL calculation)
+        Float current_ior(lookup_ior("air"));
 
         // MIS weight for intersected emitters (set by prev. iteration)
         Float emission_weight(1.f);
 
         Spectrum throughput(1.f);
 
-        // Time associated to a path
-        Float time(0.f);
+        // Time associated to a path, measured in optical path length
+        // NOTE(diego): this assumes that the ray's `time` variable is measured
+        // in OPL, we'll just have to believe now :-)
+        Float path_opl(ray.time);
 
         // ---------------------- First intersection ----------------------
 
         SurfaceInteraction3f si = scene->ray_intersect(ray, active);
-        Mask valid_ray = si.is_valid();
         EmitterPtr emitter = si.emitter(scene);
 
         for (int depth = 1;; ++depth) {
 
-            time += time_of_flight(si.distance(ray)) * eta;
+            // FIXME(diego): medium index of refraction should be used to scale
+            // the distance in order to obtain OPL.
+            path_opl += si.distance(ray) * current_ior;
+
+            // Transient samples are not going to get stored anyway, discard
+            if (path_opl > max_path_opl)
+                break;
 
             // ---------------- Intersection with emitters ----------------
 
@@ -53,28 +62,15 @@ public:
                 Spectrum radiance(0.f);
                 radiance[active] += emission_weight * throughput * emitter->eval(si, active);
                 Mask path_finished = active;
-                radianceSamplesRecordVector.emplace_back(time, radiance, path_finished);
+                timed_samples_record.emplace_back(path_opl, radiance, path_finished);
             }
 
             active &= si.is_valid();
-
-            /* Russian roulette: try to keep path weights equal to one,
-               while accounting for the solid angle compression at refractive
-               index boundaries. Stop with at least some probability to avoid
-               getting stuck (e.g. due to total internal reflection) */
-            if (depth > m_rr_depth) {
-                Float q = min(hmax(depolarize(throughput)) * sqr(eta), .95f);
-                active &= sampler->next_1d(active) < q;
-                throughput *= rcp(q);
-            }
-
 
             // Stop if we've exceeded the number of requested bounces, or
             // if there are no more active lanes. Only do this latter check
             // in GPU mode when the number of requested bounces is infinite
             // since it causes a costly synchronization.
-            // TODO: add another termination condition when path length is greater than max path length
-            //       (time > offset + exp*time)
             if ((uint32_t) depth >= (uint32_t) m_max_depth ||
                 ((!is_cuda_array_v<Float> || m_max_depth < 0) && none(active)))
                 break;
@@ -103,7 +99,8 @@ public:
 
                 Spectrum radiance(0.f);
                 radiance[active_e] += mis * throughput * bsdf_val * emitter_val;
-                radianceSamplesRecordVector.emplace_back(time + ds.dist, radiance, active_e);
+                timed_samples_record.emplace_back(
+                    path_opl + ds.dist * current_ior, radiance, active_e);
             }
 
             // ----------------------- BSDF sampling ----------------------
@@ -118,7 +115,7 @@ public:
             if (none_or<false>(active))
                 break;
 
-            eta *= bs.eta;
+            current_ior = bs.eta;
 
             // Intersect the BSDF ray against the scene geometry
             ray                          = si.spawn_ray(si.to_world(bs.wo));
