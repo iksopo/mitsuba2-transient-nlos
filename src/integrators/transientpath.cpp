@@ -16,7 +16,9 @@ public:
     MTS_IMPORT_BASE(TransientMonteCarloIntegrator, m_max_depth, m_rr_depth)
     MTS_IMPORT_TYPES(Scene, Sampler, Medium, Emitter, EmitterPtr, BSDF, BSDFPtr)
 
-    TransientPathIntegrator(const Properties &props) : Base(props) {}
+    TransientPathIntegrator(const Properties &props) : Base(props) {
+        m_nlos_emitter_sampling = props.bool_("nlos_emitter_sampling", false);
+    }
 
     void sample(const Scene *scene, Sampler *sampler, const RayDifferential3f &ray_,
                 const Medium * /* medium */,
@@ -40,6 +42,20 @@ public:
         // NOTE(diego): this assumes that the ray's `time` variable is measured
         // in OPL, we'll just have to believe now :-)
         Float path_opl(ray.time);
+
+        Point3f nlos_laser_target;
+        if (m_nlos_emitter_sampling) {
+            auto emitters = scene->emitters();
+            if (unlikely(emitters.size() != 1)) {
+                Throw("NLOS emitter sampling is not implemented for scenes "
+                      "with more than one emitter.");
+            }
+            Transform4f trafo =
+                emitters[0]->world_transform()->eval(ray.time, true);
+            Vector3f laser_dir = trafo.transform_affine(Vector3f(0, 0, 1));
+            Ray3f ray_laser(trafo.translation(), laser_dir, ray.time);
+            nlos_laser_target = scene->ray_intersect(ray_laser, true).p;
+        }
 
         // ---------------------- First intersection ----------------------
 
@@ -82,25 +98,89 @@ public:
             Mask active_e = active && has_flag(bsdf->flags(), BSDFFlags::Smooth);
 
             if (likely(any_or<true>(active_e))) {
-                auto [ds, emitter_val] =
-                    scene->sample_emitter_direction(si, sampler->next_2d(active_e), true, active_e);
-                active_e &= neq(ds.pdf, 0.f);
+                const auto f_emitter_sample =
+                    [*this](const Scene *scene, Sampler *sampler,
+                            BSDFContext &ctx, SurfaceInteraction3f &si,
+                            Mask &active_e,
+                            std::vector<RadianceSample<Float, Spectrum, Mask>>
+                                &timed_samples_record,
+                            const BSDFPtr &bsdf, const Spectrum &throughput,
+                            const Float &path_opl, const Float &current_ior) {
+                        auto [ds, emitter_val] =
+                            scene->sample_emitter_direction(
+                                si, sampler->next_2d(active_e), true, active_e);
+                        active_e &= neq(ds.pdf, 0.f);
 
-                // Query the BSDF for that emitter-sampled direction
-                Vector3f wo       = si.to_local(ds.d);
-                Spectrum bsdf_val = bsdf->eval(ctx, si, wo, active_e);
-                bsdf_val          = si.to_world_mueller(bsdf_val, -wo, si.wi);
+                        // Query the BSDF for that emitter-sampled direction
+                        Vector3f wo       = si.to_local(ds.d);
+                        Spectrum bsdf_val = bsdf->eval(ctx, si, wo, active_e);
+                        bsdf_val = si.to_world_mueller(bsdf_val, -wo, si.wi);
 
-                // Determine density of sampling that same direction using BSDF
-                // sampling
-                Float bsdf_pdf = bsdf->pdf(ctx, si, wo, active_e);
+                        // Determine density of sampling that same direction
+                        // using BSDF sampling
+                        Float bsdf_pdf = bsdf->pdf(ctx, si, wo, active_e);
 
-                Float mis = select(ds.delta, 1.f, mis_weight(ds.pdf, bsdf_pdf));
+                        Float mis =
+                            select(ds.delta, 1.f, mis_weight(ds.pdf, bsdf_pdf));
 
-                Spectrum radiance(0.f);
-                radiance[active_e] += mis * throughput * bsdf_val * emitter_val;
-                timed_samples_record.emplace_back(
-                    path_opl + ds.dist * current_ior, radiance, active_e);
+                        Spectrum radiance(0.f);
+                        radiance[active_e] +=
+                            mis * throughput * bsdf_val * emitter_val;
+
+                        timed_samples_record.emplace_back(
+                            path_opl + ds.dist * current_ior, radiance,
+                            active_e);
+                    };
+
+                if (!m_nlos_emitter_sampling) {
+                    // same emitter sampling as before
+                    f_emitter_sample(scene, sampler, ctx, si, active_e,
+                                     timed_samples_record, bsdf, throughput,
+                                     path_opl, current_ior);
+                } else {
+                    // nlos scenes only have one laser emitter - standard
+                    // emitter sampling techniques do not apply as most
+                    // directions do not emit any radiance, it needs to be very
+                    // lucky to bsdf sample the exact point that the laser is
+                    // illuminating
+                    //
+                    // this modifies the emitter sampling so instead of directly
+                    // sampling the laser we sample (1) the point that the laser
+                    // is illuminating and then (2) the laser
+
+                    // 1. Obtain direction to NLOS illuminated point
+                    //    and test visibility with ray_test
+                    Vector3f d = nlos_laser_target - si.p;
+                    Float dist = norm(d);
+                    d /= dist;
+                    Ray3f ray_bsdf(si.p, d,
+                                   math::RayEpsilon<Float> *
+                                       (1.f + hmax(abs(si.p))),
+                                   dist * (1.f - math::ShadowEpsilon<Float>),
+                                   si.time, si.wavelengths);
+                    // active rays are those that did NOT intersect
+                    active_e &= !scene->ray_test(ray_bsdf, active_e);
+
+                    // 2. Evaluate BSDF to desired direction
+                    if (d.z() < -math::RayEpsilon<Float> &&
+                        any_or<true>(active_e)) {
+                        Vector3f wo       = si.to_local(d);
+                        Spectrum bsdf_val = bsdf->eval(ctx, si, wo, active_e);
+                        bsdf_val = si.to_world_mueller(bsdf_val, -wo, si.wi);
+
+                        ray_bsdf.maxt = math::Infinity<Float>;
+                        SurfaceInteraction3f si_bsdf =
+                            scene->ray_intersect(ray_bsdf, active_e);
+                        BSDFPtr bsdf_next = si_bsdf.bsdf(ray_bsdf);
+
+                        // 3. Combine nlos + emitter sampling
+                        f_emitter_sample(scene, sampler, ctx, si_bsdf, active_e,
+                                         timed_samples_record, bsdf_next,
+                                         throughput * bsdf_val,
+                                         path_opl + dist * current_ior,
+                                         current_ior);
+                    }
+                }
             }
 
             // ----------------------- BSDF sampling ----------------------
@@ -157,6 +237,8 @@ public:
     }
 
     MTS_DECLARE_CLASS()
+private:
+    bool m_nlos_emitter_sampling;
 };
 
 MTS_IMPLEMENT_CLASS_VARIANT(TransientPathIntegrator, TransientMonteCarloIntegrator)
