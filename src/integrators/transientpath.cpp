@@ -113,12 +113,17 @@ public:
 
                         // Query the BSDF for that emitter-sampled direction
                         Vector3f wo       = si.to_local(ds.d);
-                        Spectrum bsdf_val = bsdf->eval(ctx, si, wo, active_e);
-                        bsdf_val = si.to_world_mueller(bsdf_val, -wo, si.wi);
+                        Spectrum bsdf_val = select(
+                            neq(bsdf, nullptr),
+                            si.to_world_mueller(
+                                bsdf->eval(ctx, si, wo, active_e), -wo, si.wi),
+                            0.0f);
 
                         // Determine density of sampling that same direction
                         // using BSDF sampling
-                        Float bsdf_pdf = bsdf->pdf(ctx, si, wo, active_e);
+                        Float bsdf_pdf =
+                            select(neq(bsdf, nullptr),
+                                   bsdf->pdf(ctx, si, wo, active_e), 0.0f);
 
                         Float mis =
                             select(ds.delta, 1.f, mis_weight(ds.pdf, bsdf_pdf));
@@ -162,8 +167,7 @@ public:
                     active_e &= !scene->ray_test(ray_bsdf, active_e);
 
                     // 2. Evaluate BSDF to desired direction
-                    if (d.z() < -math::RayEpsilon<Float> &&
-                        any_or<true>(active_e)) {
+                    if (any_or<true>(active_e)) {
                         Vector3f wo       = si.to_local(d);
                         Spectrum bsdf_val = bsdf->eval(ctx, si, wo, active_e);
                         bsdf_val = si.to_world_mueller(bsdf_val, -wo, si.wi);
@@ -171,14 +175,18 @@ public:
                         ray_bsdf.maxt = math::Infinity<Float>;
                         SurfaceInteraction3f si_bsdf =
                             scene->ray_intersect(ray_bsdf, active_e);
-                        BSDFPtr bsdf_next = si_bsdf.bsdf(ray_bsdf);
+                        active_e &= si_bsdf.is_valid();
 
-                        // 3. Combine nlos + emitter sampling
-                        f_emitter_sample(scene, sampler, ctx, si_bsdf, active_e,
-                                         timed_samples_record, bsdf_next,
-                                         throughput * bsdf_val,
-                                         path_opl + dist * current_ior,
-                                         current_ior);
+                        if (any(active_e)) {
+                            BSDFPtr bsdf_next = si_bsdf.bsdf(ray_bsdf);
+
+                            // 3. Combine nlos + emitter sampling
+                            f_emitter_sample(scene, sampler, ctx, si_bsdf,
+                                             active_e, timed_samples_record,
+                                             bsdf_next, throughput * bsdf_val,
+                                             path_opl + dist * current_ior,
+                                             current_ior);
+                        }
                     }
                 }
             }
@@ -203,6 +211,8 @@ public:
 
             /* Determine probability of having sampled that same
                direction using emitter sampling. */
+            // NOTE(diego): NLOS scenes (should) only have point light emitters,
+            //              so they cannot be reached with BSDF sampling
             emitter = si_bsdf.emitter(scene, active);
             DirectionSample3f ds(si_bsdf, si);
             ds.object = emitter;
