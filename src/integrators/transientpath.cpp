@@ -17,6 +17,10 @@ public:
     MTS_IMPORT_TYPES(Scene, Sampler, Medium, Emitter, EmitterPtr, BSDF, BSDFPtr)
 
     TransientPathIntegrator(const Properties &props) : Base(props) {
+        m_filter_depth = props.int_("filter_depth", -1);
+        m_discard_direct_paths = props.bool_("discard_direct_paths", false);
+        // avoid the case m_discard_direct_paths && m_filter_depth > 0
+        Assert(!m_discard_direct_paths || m_filter_depth <= 0);
         m_nlos_emitter_sampling = props.bool_("nlos_emitter_sampling", false);
     }
 
@@ -78,7 +82,8 @@ public:
                 Spectrum radiance(0.f);
                 radiance[active] += emission_weight * throughput * emitter->eval(si, active);
                 Mask path_finished = active;
-                timed_samples_record.emplace_back(path_opl, radiance, path_finished);
+                if (depth == m_filter_depth || (!m_discard_direct_paths || depth >= 2))
+                    timed_samples_record.emplace_back(path_opl, radiance, path_finished);
             }
 
             active &= si.is_valid();
@@ -105,7 +110,8 @@ public:
                             std::vector<RadianceSample<Float, Spectrum, Mask>>
                                 &timed_samples_record,
                             const BSDFPtr &bsdf, const Spectrum &throughput,
-                            const Float &path_opl, const Float &current_ior) {
+                            const Float &path_opl, const Float &current_ior,
+                            const int &depth) {
                         auto [ds, emitter_val] =
                             scene->sample_emitter_direction(
                                 si, sampler->next_2d(active_e), true, active_e);
@@ -132,16 +138,17 @@ public:
                         radiance[active_e] +=
                             mis * throughput * bsdf_val * emitter_val;
 
-                        timed_samples_record.emplace_back(
-                            path_opl + ds.dist * current_ior, radiance,
-                            active_e);
+                        if (depth == m_filter_depth || (!m_discard_direct_paths || depth >= 2))
+                            timed_samples_record.emplace_back(
+                                path_opl + ds.dist * current_ior, radiance,
+                                active_e);
                     };
 
                 if (!m_nlos_emitter_sampling) {
                     // same emitter sampling as before
                     f_emitter_sample(scene, sampler, ctx, si, active_e,
                                      timed_samples_record, bsdf, throughput,
-                                     path_opl, current_ior);
+                                     path_opl, current_ior, depth);
                 } else {
                     // nlos scenes only have one laser emitter - standard
                     // emitter sampling techniques do not apply as most
@@ -185,7 +192,7 @@ public:
                                              active_e, timed_samples_record,
                                              bsdf_next, throughput * bsdf_val,
                                              path_opl + dist * current_ior,
-                                             current_ior);
+                                             current_ior, depth);
                         }
                     }
                 }
@@ -248,6 +255,8 @@ public:
 
     MTS_DECLARE_CLASS()
 private:
+    int m_filter_depth;
+    bool m_discard_direct_paths;
     bool m_nlos_emitter_sampling;
 };
 
