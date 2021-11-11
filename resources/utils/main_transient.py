@@ -1,5 +1,6 @@
 import argparse
 import glob
+import os
 from pathlib import Path
 
 import imageio
@@ -39,7 +40,7 @@ def read_streakimg(dir: str, extension: str = "exr") -> np.array:
     return np.nan_to_num(streak_img, nan=0.)
 
 
-def read_streakimg_mitsuba(dir: str, extension: str = "exr") -> np.array:
+def read_streakimg_mitsuba(dir_path: str, extension: str = "exr") -> np.array:
     """
     Reads all the images x-t that compose the streak image.
 
@@ -48,12 +49,12 @@ def read_streakimg_mitsuba(dir: str, extension: str = "exr") -> np.array:
     :return: a streak image of shape [height, width, time, nchannels]
     """
     from mitsuba.core import Bitmap, Struct, float_dtype
-    number_of_xtframes = len(glob.glob(f"{dir}/frame_*.{extension}"))
-    first_img = np.array(Bitmap(f"{dir}/frame_0.{extension}"), copy=False)
+    number_of_xtframes = len(glob.glob(os.path.join(glob.escape(dir_path), f'frame_*.{extension}')))
+    first_img = np.array(Bitmap(f"{dir_path}/frame_0.{extension}"), copy=False)
     streak_img = np.empty((number_of_xtframes, *first_img.shape), dtype=first_img.dtype)
     with tqdm(total=number_of_xtframes, ascii=True) as pbar:
         for i_xtframe in range(number_of_xtframes):
-            other = Bitmap(f"{dir}/frame_{i_xtframe}.{extension}")
+            other = Bitmap(f"{dir_path}/frame_{i_xtframe}.{extension}")
             #     .convert(Bitmap.PixelFormat.RGBA, Struct.Type.Float32, srgb_gamma=False)
             streak_img[i_xtframe] = np.nan_to_num(np.array(other, copy=False), nan=0.)
             pbar.update(1)
