@@ -194,7 +194,7 @@ public:
                                              active_e, timed_samples_record,
                                              bsdf_next, throughput * bsdf_val,
                                              path_opl + dist * current_ior,
-                                             current_ior, depth);
+                                             current_ior, depth + 1);
                         }
                     }
                 }
