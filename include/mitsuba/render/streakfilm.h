@@ -19,7 +19,13 @@ class MTS_EXPORT_RENDER StreakFilm : public Film<Float, Spectrum> {
 public:
     MTS_IMPORT_BASE(Film, m_size, m_crop_size, m_crop_offset,
                     m_filter, m_high_quality_edges, bitmap)
-    MTS_IMPORT_TYPES(ImageBlock, StreakImageBlock, ReconstructionFilter)
+    MTS_IMPORT_TYPES(ImageBlock, StreakImageBlock, ReconstructionFilter,
+                     Scene, Sensor, Sampler, Medium, TransientSamplingIntegrator)
+
+    bool should_auto_detect_bins() const { return m_auto_detect_bins; }
+
+    /// Set start_opl and bin_width_opl based on preliminary testing
+    void auto_detect_bins(Scene* scene, Sensor* sensor);
 
     /// Merge an image block into the film. This methods should be thread-safe.
     virtual void put(const StreakImageBlock *block) = 0;
@@ -63,6 +69,7 @@ protected:
     uint32_t m_num_bins;
     float m_bin_width_opl;
     float m_start_opl;
+    bool m_auto_detect_bins;
     ref<ReconstructionFilter> m_time_filter;
 };
 

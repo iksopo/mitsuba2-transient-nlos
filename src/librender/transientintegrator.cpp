@@ -75,6 +75,8 @@ MTS_VARIANT bool TransientSamplingIntegrator<Float, Spectrum>::render(Scene *sce
     // Insert default channels and set up the film
     for (size_t i = 0; i < 5; ++i)
         channels.insert(channels.begin() + i, std::string(1, "XYZAW"[i]));
+    if (film->should_auto_detect_bins())
+        film->auto_detect_bins(scene, sensor);
     film->prepare(channels);
 
     m_render_timer.reset();

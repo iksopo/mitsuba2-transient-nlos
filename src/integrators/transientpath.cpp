@@ -185,6 +185,8 @@ public:
                         SurfaceInteraction3f si_bsdf =
                             scene->ray_intersect(ray_bsdf, active_e);
                         active_e &= si_bsdf.is_valid();
+                        active_e &= any_inner(
+                            depolarize<Spectrum>(bsdf_val) > math::Epsilon<Float>);
 
                         if (any(active_e)) {
                             BSDFPtr bsdf_next = si_bsdf.bsdf(ray_bsdf);

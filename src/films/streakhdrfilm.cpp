@@ -70,8 +70,8 @@ template <typename Float, typename Spectrum>
 class StreakHDRFilm final : public StreakFilm<Float, Spectrum> {
 public:
     MTS_IMPORT_BASE(StreakFilm, m_size, m_crop_size, m_crop_offset, m_num_bins,
-                    m_bin_width_opl, m_start_opl, m_high_quality_edges,
-                    m_filter, m_time_filter)
+                    m_bin_width_opl, m_start_opl, m_auto_detect_bins,
+                    m_high_quality_edges, m_filter, m_time_filter)
     MTS_IMPORT_TYPES(ReconstructionFilter, StreakImageBlock, ImageBlock)
 
     StreakHDRFilm(const Properties &props) : Base(props) {
