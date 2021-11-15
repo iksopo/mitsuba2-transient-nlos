@@ -23,7 +23,7 @@ MTS_VARIANT StreakFilm<Float, Spectrum>::StreakFilm(const Properties &props) : B
         props.float_("bin_width_opl", props.float_("exposure_time", -1.f));
     m_start_opl = props.float_("start_opl", props.float_("time_offset", -1.f));
     m_auto_detect_bins = props.bool_("auto_detect_bins", false);
-    Assert(!m_auto_detect_bins || (m_start_opl < 0.f && m_bin_width_opl < 0.f));
+    Assert(!m_auto_detect_bins || m_start_opl < 0.f);
 
     // Use the provided reconstruction filter, if any.
     for (auto &[name, obj] : props.objects(false)) {
@@ -141,14 +141,22 @@ MTS_VARIANT void StreakFilm<Float, Spectrum>::auto_detect_bins(Scene *scene,
         });
 
     Float initial_bin_width    = (global_max_opl - global_min_opl) / m_num_bins;
-    size_t edge_padding_before = m_num_bins / 200; // bins
-    size_t edge_padding_after  = m_num_bins / 20;  // bins
+    size_t edge_padding_before = m_num_bins / 20; // bins
+    size_t edge_padding_after  = m_num_bins / 5;  // bins
     // add some left-right padding just in case
     m_start_opl     = global_min_opl - edge_padding_before * initial_bin_width;
     Float m_end_opl = global_max_opl + edge_padding_after * initial_bin_width;
-    m_bin_width_opl = (m_end_opl - m_start_opl) / m_num_bins;
+    if (m_bin_width_opl < 0.f) {
+        m_bin_width_opl = (m_end_opl - m_start_opl) / m_num_bins;
+    } else {
+        Log(Info, "Using user-specified StreakFilm bin width: %i",
+            m_bin_width_opl);
+        m_end_opl = m_start_opl + m_bin_width_opl * m_num_bins;
+    }
 
-    Log(Info, "Auto-detected StreakFilm histogram OPL limits: [%i, %i] with bin width %i",
+    Log(Info,
+        "Auto-detected StreakFilm histogram OPL limits: [%i, %i] with bin "
+        "width %i",
         m_start_opl, m_end_opl, m_bin_width_opl);
 }
 
