@@ -188,6 +188,14 @@ public:
                         active_e &= any_inner(
                             depolarize<Spectrum>(bsdf_val) > math::Epsilon<Float>);
 
+                        // NOTE(diego): as points are not randomly chosen,
+                        // we need to account for d^2 and cos term because of
+                        // the solid angle projection of si.p to
+                        // nlos_laser_target. The incident cos term at
+                        // nlos_laser_target will be taken into account by
+                        // f_emitter_sample's bsdf
+                        bsdf_val *= rcp(sqr(dist)) * Frame3f::cosTheta(wo);
+
                         if (any(active_e)) {
                             BSDFPtr bsdf_next = si_bsdf.bsdf(ray_bsdf);
 
