@@ -194,7 +194,7 @@ public:
                         // nlos_laser_target. The incident cos term at
                         // nlos_laser_target will be taken into account by
                         // f_emitter_sample's bsdf
-                        bsdf_val *= rcp(sqr(dist)) * Frame3f::cos_theta(wo);
+                        bsdf_val *= sqr(rcp(dist)) * Frame3f::cos_theta(wo);
 
                         if (any(active_e)) {
                             BSDFPtr bsdf_next = si_bsdf.bsdf(ray_bsdf);
@@ -222,7 +222,7 @@ public:
             if (none_or<false>(active))
                 break;
 
-            current_ior = bs.eta;
+            current_ior *= bs.eta;
 
             // Intersect the BSDF ray against the scene geometry
             ray                          = si.spawn_ray(si.to_world(bs.wo));

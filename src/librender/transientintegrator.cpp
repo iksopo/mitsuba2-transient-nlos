@@ -110,46 +110,57 @@ MTS_VARIANT bool TransientSamplingIntegrator<Float, Spectrum>::render(Scene *sce
         std::mutex mutex;
 
         // Total number of blocks to be handled, including multiple passes.
-        size_t total_blocks = spiral.block_count() * n_passes,
-               blocks_done = 0;
+        size_t total_blocks = spiral.block_count() * n_passes, blocks_done = 0;
+
+        // each pass/block is divided into multiple divs so progress bar updates
+        // more smoothly
+        size_t samples_per_div = 100000;
+        size_t n_divs          = (samples_per_pass - 1) / samples_per_div + 1;
+        Log(Info, "Using (%i - 1) / %i + 1 = %i divs", samples_per_pass,
+            samples_per_div, n_divs);
 
         tbb::parallel_for(
             tbb::blocked_range<size_t>(0, total_blocks, 1),
             [&](const tbb::blocked_range<size_t> &range) {
                 ScopedSetThreadEnvironment set_env(env);
-                ref<Sampler> sampler = sensor->sampler()->clone();
-                ref<StreakImageBlock> block = new StreakImageBlock(m_block_size,
-                                                       film->num_bins(),
-                                                       film->bin_width_opl(),
-                                                       film->start_opl(),
-                                                       channels.size(),
-                                                       film->reconstruction_filter(),
-                                                       film->time_reconstruction_filter(),
-                                                       !has_aovs);
+                ref<Sampler> sampler        = sensor->sampler()->clone();
+                ref<StreakImageBlock> block = new StreakImageBlock(
+                    m_block_size, film->num_bins(), film->bin_width_opl(),
+                    film->start_opl(), channels.size(),
+                    film->reconstruction_filter(),
+                    film->time_reconstruction_filter(), !has_aovs);
                 scoped_flush_denormals flush_denormals(true);
-                // TODO: remove std::unique_ptr<Float[]> aovs(new Float[channels.size()]);
 
                 // For each block
-                for (auto i = range.begin(); i != range.end() && !should_stop(); ++i) {
+                for (auto i = range.begin(); i != range.end() && !should_stop();
+                     ++i) {
                     auto [offset, size, block_id] = spiral.next_block();
                     Assert(hprod(size) != 0);
                     block->set_size(size, film->num_bins());
                     block->set_offset(offset);
+                    for (size_t div = 0; div < n_divs && !should_stop();
+                         div++) {
+                        size_t n_samples =
+                            div == n_divs - 1 ? (samples_per_pass -
+                                                 (n_divs - 1) * samples_per_div)
+                                              : samples_per_div;
 
-                    std::vector<FloatTimeSample<Float, Mask>> aovsRecordVector;
-                    render_block(scene, sensor, sampler, block,
-                                 aovsRecordVector, samples_per_pass, block_id);
+                        std::vector<FloatTimeSample<Float, Mask>> aovs_record;
+                        render_block(scene, sensor, sampler, block, aovs_record,
+                                     n_samples, block_id * n_divs + div);
 
-                    film->put(block);
+                        film->put(block);
 
-                    /* Critical section: update progress bar */ {
-                        std::lock_guard<std::mutex> lock(mutex);
-                        blocks_done++;
-                        progress->update(blocks_done / (ScalarFloat) total_blocks);
+                        /* Critical section: update progress bar */ {
+                            std::lock_guard<std::mutex> lock(mutex);
+                            blocks_done++;
+                            progress->update(
+                                blocks_done /
+                                (ScalarFloat)(total_blocks * n_divs));
+                        }
                     }
                 }
-            }
-        );
+            });
     } else {
         Log(Info, "Start rendering...");
 

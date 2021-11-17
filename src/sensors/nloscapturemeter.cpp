@@ -74,7 +74,7 @@ children:
 template <typename Float, typename Spectrum>
 class NLOSCaptureMeter final : public Sensor<Float, Spectrum> {
 public:
-    MTS_IMPORT_BASE(Sensor, m_film, m_world_transform, m_shape)
+    MTS_IMPORT_BASE(Sensor, m_film, m_world_transform, m_shape, m_needs_sample_3)
     MTS_IMPORT_TYPES(Scene, Shape, Emitter, ReconstructionFilter)
 
     NLOSCaptureMeter(const Properties &props) : Base(props) {
@@ -96,6 +96,9 @@ public:
                 props.mark_queried(name);
             }
         }
+
+        // unused (?) its only set but it is not read anywhere
+        m_needs_sample_3 = false;
 
         m_account_first_and_last_bounces =
             props.bool_("account_first_and_last_bounces", true);
@@ -213,19 +216,12 @@ public:
             unpolarized<Spectrum>(wav_weight) * math::Pi<ScalarFloat>);
     }
 
-    std::pair<DirectionSample3f, Spectrum>
-    sample_direction(const Interaction3f &it, const Point2f &sample,
-                     Mask active) const override {
-        return std::make_pair(m_shape->sample_direction(it, sample, active),
-                              math::Pi<ScalarFloat>);
-    }
-
-    Float pdf_direction(const Interaction3f & /*it*/,
-                        const DirectionSample3f & /*ds*/,
+    Float pdf_direction(const Interaction3f & it,
+                        const DirectionSample3f & ds,
                         Mask active) const override {
-        // return m_shape->pdf_direction(it, ds, active);
-        MTS_MASK_ARGUMENT(active);
-        return Float(1.f);
+        // TODO(diego): maybe this should be used in sample_ray_differential
+        // to scale the pdf? (second return value)
+        return m_shape->pdf_direction(it, ds, active);
     }
 
     Spectrum eval(const SurfaceInteraction3f & /*si*/,
