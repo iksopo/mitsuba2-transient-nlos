@@ -73,8 +73,8 @@ MTS_VARIANT bool TransientSamplingIntegrator<Float, Spectrum>::render(Scene *sce
     bool has_aovs = !channels.empty();
 
     // Insert default channels and set up the film
-    for (size_t i = 0; i < 5; ++i)
-        channels.insert(channels.begin() + i, std::string(1, "XYZAW"[i]));
+    for (size_t i = 0; i < 4; ++i)
+        channels.insert(channels.begin() + i, std::string(1, "XYZA"[i]));
     if (film->should_auto_detect_bins())
         film->auto_detect_bins(scene, sensor);
     film->prepare(channels);
@@ -375,7 +375,6 @@ TransientSamplingIntegrator<Float, Spectrum>::render_sample(const Scene *scene,
         for(const auto &xyzRecord: xyzVector) {
             FloatTimeSample<Float, Mask> color(xyzRecord.opl, xyzRecord.mask);
             // Reversed
-            color.push_front(1.f);
             color.push_front(select(xyzRecord.mask, Float(1.f), Float(0.f)));
             color.push_front(xyzRecord.radiance.z());
             color.push_front(xyzRecord.radiance.y());
@@ -384,7 +383,6 @@ TransientSamplingIntegrator<Float, Spectrum>::render_sample(const Scene *scene,
         }
     } else {
         for (int i = 0; i < aovs_record.size(); ++i) {
-            aovs_record[i].push_front(1.f);
             aovs_record[i].push_front(select(xyzVector[i].mask, Float(1.f), Float(0.f)));
             aovs_record[i].push_front(xyzVector[i].radiance.z());
             aovs_record[i].push_front(xyzVector[i].radiance.y());

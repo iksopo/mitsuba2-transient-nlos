@@ -236,7 +236,7 @@ public:
         }
 
         ref<Bitmap> source = new Bitmap(
-            m_channels.size() != 5 ? Bitmap::PixelFormat::MultiChannel : Bitmap::PixelFormat::XYZAW,
+            m_channels.size() != 4 ? Bitmap::PixelFormat::MultiChannel : Bitmap::PixelFormat::XYZA,
             struct_type_v<ScalarFloat>,
             {m_storage->size().x() * m_storage->time(), m_storage->size().y()},
             m_storage->channel_count(),
@@ -246,7 +246,7 @@ public:
         if (raw)
             return source;
 
-        bool has_aovs = m_channels.size() != 5;
+        bool has_aovs = m_channels.size() != 4;
 
         ref<Bitmap> target = new Bitmap(
             has_aovs ? Bitmap::PixelFormat::MultiChannel : m_pixel_format,
@@ -315,7 +315,7 @@ public:
         DynamicBuffer<Float> dslice = m_storage->data(slice);
 
         ref<Bitmap> source = new Bitmap(
-            m_channels.size() != 5 ? Bitmap::PixelFormat::MultiChannel : Bitmap::PixelFormat::XYZAW,
+            m_channels.size() != 4 ? Bitmap::PixelFormat::MultiChannel : Bitmap::PixelFormat::XYZA,
             struct_type_v<ScalarFloat>,
             {m_storage->time(), m_storage->width()},
             m_storage->channel_count(),
@@ -331,7 +331,7 @@ public:
         if (raw)
             return source;
 
-        bool has_aovs = m_channels.size() != 5;
+        bool has_aovs = m_channels.size() != 4;
 
         ref<Bitmap> target = new Bitmap(
             has_aovs ? Bitmap::PixelFormat::MultiChannel : m_pixel_format,
