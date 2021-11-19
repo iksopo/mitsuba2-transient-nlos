@@ -109,17 +109,31 @@ public:
             ->append(0.f, Transform4f::translate(
                               props.point3f("sensor_origin", 0.f)));
 
-        m_laser_origin        = props.point3f("laser_origin", 0.f);
-        Point3f laser_lookat3 = props.point3f("laser_lookat_pixel", 0.f);
-        auto [film_width, film_height] = film_size();
-        if (laser_lookat3.x() < 0 || film_width < laser_lookat3.x())
-            Log(Warn, "Laser lookat pixel (X position) is out of bounds");
-        if (laser_lookat3.y() < 0 || film_height < laser_lookat3.y())
-            Log(Warn, "Laser lookat pixel (Y position) is out of bounds");
-        if (abs(laser_lookat3.z()) > math::Epsilon<float>)
-            Log(Warn, "Laser lookat pixel (Z position) should be 0");
-        Point2f laser_lookat_pixel(laser_lookat3.x(), laser_lookat3.y());
-        m_target_lookat_sample = pixel_to_sample(laser_lookat_pixel);
+        m_laser_origin              = props.point3f("laser_origin", 0.f);
+        Point3f laser_lookat3_pixel = props.point3f("laser_lookat_pixel", -1.f);
+        Point3f laser_lookat3_3d    = props.point3f("laser_lookat_3d", -1.f);
+        bool lookat_is_pixel        = all(laser_lookat3_pixel > 0.f);
+        bool lookat_is_3d           = all(laser_lookat3_3d > 0.f);
+        if ((lookat_is_pixel && lookat_is_3d) ||
+            (!lookat_is_pixel && !lookat_is_3d)) {
+            Throw("NLOSCaptureMeter: laser target position should be set using "
+                  "only one of laser_lookat_pixel or laser_lookat_3d ");
+        }
+        m_target_lookat_is_pixel = lookat_is_pixel;
+        if (m_target_lookat_is_pixel) {
+            auto [film_width, film_height] = film_size();
+            if (laser_lookat3_pixel.x() < 0 ||
+                film_width < laser_lookat3_pixel.x())
+                Log(Warn, "Laser lookat pixel (X position) is out of bounds");
+            if (laser_lookat3_pixel.y() < 0 ||
+                film_height < laser_lookat3_pixel.y())
+                Log(Warn, "Laser lookat pixel (Y position) is out of bounds");
+            if (abs(laser_lookat3_pixel.z()) > math::Epsilon<float>)
+                Log(Warn, "Laser lookat pixel (Z position) should be 0");
+            m_target_lookat = laser_lookat3_pixel;
+        } else {
+            m_target_lookat = laser_lookat3_3d;
+        }
 
         auto pmgr = PluginManager::instance();
         if (!m_emitter) {
@@ -147,8 +161,16 @@ private:
     void set_shape(Shape *shape) override {
         Base::set_shape(shape);
 
-        Point3f laser_target =
-            m_shape->sample_position(0.f, m_target_lookat_sample).p;
+        Point3f laser_target; // 3d
+        if (m_target_lookat_is_pixel) {
+            Point2f laser_lookat_pixel(m_target_lookat.x(),
+                                       m_target_lookat.y());
+            Point2f target_lookat_sample = pixel_to_sample(laser_lookat_pixel);
+            laser_target =
+                m_shape->sample_position(0.f, target_lookat_sample).p;
+        } else {
+            laser_target = m_target_lookat;
+        }
         // NOTE(diego): const_cast bad, don't care
         const_cast<AnimatedTransform *>(m_emitter->world_transform())
             ->append(0.f, Transform4f::look_at(m_laser_origin, laser_target,
@@ -247,7 +269,10 @@ public:
 private:
     ref<Emitter> m_emitter;
     Point3f m_laser_origin;
-    Point2f m_target_lookat_sample;
+    Point3f m_target_lookat;
+    // true: m_target_lookat is (x, y, 0) pixel in m_sensor
+    // false: m_target_lookat is (x, y, z) world coordinates
+    bool m_target_lookat_is_pixel;
     bool m_account_first_and_last_bounces;
     Float m_laser_bounce_opl;
 };
