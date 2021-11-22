@@ -117,7 +117,7 @@ public:
              const Wavelength &wavelengths,
              const std::vector<RadianceSample<Float, Spectrum, Mask>> &radianceSampleVector,
              const Float &alpha) {
-        if (unlikely(m_channel_count != 5))
+        if (unlikely(m_channel_count != 4))
             Throw("ImageBlock::put(): non-standard image block configuration! (AOVs?)");
         std::vector<RadianceSample<Float, UnpolarizedSpectrum, Mask>> radianceSampleVector_u = {};
         for (const auto &radianceSampleRecord : radianceSampleVector) {
@@ -158,7 +158,6 @@ public:
         for(const auto &xyzRecord: xyzVector) {
             FloatTimeSample<Float, Mask> color(xyzRecord.opl, xyzRecord.mask);
             // Reversed
-            color.push_front(1.f);
             color.push_front(select(xyzRecord.mask, Float(1.f), Float(0.f)));
             color.push_front(xyzRecord.radiance.z());
             color.push_front(xyzRecord.radiance.y());

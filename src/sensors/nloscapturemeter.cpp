@@ -52,6 +52,8 @@ children:
    film in a plane, a laser pointed to (7.5, 15.5) will point to the middle of
    the plane. Note that the X, Y coordinates are 0-indexed and the Z coordinate
    should be 0.
+ * `laser_lookat_3d`: If `laser_lookat_pixel` is not set, you can use this
+   option to directly specify the 3d position to point the laser to
  * `account_first_and_last_bounces`: If false, the time it takes for light
    to travel (laser --> relay wall + relay_wall --> sensor) is substracted.
 
@@ -66,6 +68,8 @@ children:
             <point name="laser_origin" x="1" y="0" z="0" />
             <point name="laser_lookat_pixel" x="9" y="15" z="0" />
             <!-- film (recommended: streakhdrfilm) -->
+                <!-- NOTE: recommended to prevent clamping -->
+                <string name="component_format" value="float32"/>
             <!-- emitter (recommended: projector) -->
         </sensor>
     </shape>
@@ -111,15 +115,8 @@ public:
 
         m_laser_origin              = props.point3f("laser_origin", 0.f);
         Point3f laser_lookat3_pixel = props.point3f("laser_lookat_pixel", -1.f);
-        Point3f laser_lookat3_3d    = props.point3f("laser_lookat_3d", -1.f);
-        bool lookat_is_pixel        = all(laser_lookat3_pixel > 0.f);
-        bool lookat_is_3d           = all(laser_lookat3_3d > 0.f);
-        if ((lookat_is_pixel && lookat_is_3d) ||
-            (!lookat_is_pixel && !lookat_is_3d)) {
-            Throw("NLOSCaptureMeter: laser target position should be set using "
-                  "only one of laser_lookat_pixel or laser_lookat_3d ");
-        }
-        m_target_lookat_is_pixel = lookat_is_pixel;
+        Point3f laser_lookat3_3d    = props.point3f("laser_lookat_3d", 0.f);
+        m_target_lookat_is_pixel    = all(laser_lookat3_pixel > 0.f);
         if (m_target_lookat_is_pixel) {
             auto [film_width, film_height] = film_size();
             if (laser_lookat3_pixel.x() < 0 ||
@@ -168,8 +165,15 @@ private:
             Point2f target_lookat_sample = pixel_to_sample(laser_lookat_pixel);
             laser_target =
                 m_shape->sample_position(0.f, target_lookat_sample).p;
+            Log(Info,
+                "Laser is pointed to pixel (%d, %d), which equals to 3D point "
+                "(%d, %d, %d)",
+                m_target_lookat.x(), m_target_lookat.y(), //
+                laser_target.x(), laser_target.y(), laser_target.z());
         } else {
             laser_target = m_target_lookat;
+            Log(Info, "Laser is pointed to 3D point (%d, %d, %d)",
+                laser_target.x(), laser_target.y(), laser_target.z());
         }
         // NOTE(diego): const_cast bad, don't care
         const_cast<AnimatedTransform *>(m_emitter->world_transform())
@@ -180,7 +184,10 @@ private:
             norm(laser_target - m_laser_origin) * lookup_ior("air");
     }
 
-    // TODO(diego): traverse function?
+    void traverse(TraversalCallback *callback) override {
+        Base::traverse(callback);
+        // NOTE(diego): not implemented
+    }
 
 private:
     std::pair<uint, uint> film_size() const {
@@ -241,8 +248,9 @@ public:
     Float pdf_direction(const Interaction3f & it,
                         const DirectionSample3f & ds,
                         Mask active) const override {
-        // TODO(diego): maybe this should be used in sample_ray_differential
-        // to scale the pdf? (second return value)
+        // NOTE(diego): this could be used in sample_ray_differential
+        // but other sensors do not do it (e.g. for a thin lens camera,
+        // vignetting is not accounted for using this function)
         return m_shape->pdf_direction(it, ds, active);
     }
 
@@ -251,7 +259,6 @@ public:
         return math::Pi<ScalarFloat> / m_shape->surface_area();
     }
 
-    // TODO(diego): check if I should change bbox
     ScalarBoundingBox3f bbox() const override { return m_shape->bbox(); }
 
     std::string to_string() const override {
