@@ -23,14 +23,10 @@ NAMESPACE_BEGIN(mitsuba)
  * \brief Abstract transient integrator base class, which does not make any
  * assumptions with regards to how radiance is computed.
  *
- * In Mitsuba, the different rendering techniques are collectively referred to
- * as \a integrators, since they perform integration over a high-dimensional space.
- * Each transient integrator represents a specific approach for solving the transient
- * light transport equation.
- *
- * This is the base class of all transient integrators; it does not make any
- * assumptions on how radiance is computed, which allows for many different
- * kinds of implementations.
+ * Whereas standard \ref Integrator objects return a single radiance value
+ * for each path segment, transient integrators can return multiple radiance
+ * values at different points in time (e.g. \c timed_samples_record for
+ * \ref TransientSamplingIntegrator).
  */
 template <typename Float, typename Spectrum>
 class MTS_EXPORT_RENDER TransientIntegrator
@@ -112,8 +108,8 @@ public:
      *    In the Python bindings, this function returns the \c aov output
      *    argument as an additional return value. In other words:
      *    <tt>
-     *        (spec, mask, aov) = integrator.sample(scene, sampler, ray, medium,
-     * active)
+     *        (spec, mask, aov) = \
+     *          integrator.sample(scene, sampler, ...)
      *    </tt>
      */
     virtual void sample(const Scene *scene,

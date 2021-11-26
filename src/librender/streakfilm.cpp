@@ -46,10 +46,6 @@ MTS_VARIANT StreakFilm<Float, Spectrum>::StreakFilm(const Properties &props) : B
     }
 }
 
-// MTS_VARIANT void StreakFilm<Float, Spectrum>::put(const ImageBlock *block) {
-//    NotImplementedError("put");
-// }
-
 MTS_VARIANT StreakFilm<Float, Spectrum>::~StreakFilm() {}
 
 MTS_VARIANT void StreakFilm<Float, Spectrum>::auto_detect_bins(Scene *scene,

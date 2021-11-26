@@ -118,7 +118,7 @@ public:
              const std::vector<RadianceSample<Float, Spectrum, Mask>> &radianceSampleVector,
              const Float &alpha) {
         if (unlikely(m_channel_count != 4))
-            Throw("ImageBlock::put(): non-standard image block configuration! (AOVs?)");
+            Throw("StreakImageBlock::put(): non-standard image block configuration! (AOVs?)");
         std::vector<RadianceSample<Float, UnpolarizedSpectrum, Mask>> radianceSampleVector_u = {};
         for (const auto &radianceSampleRecord : radianceSampleVector) {
             radianceSampleVector_u.emplace_back(

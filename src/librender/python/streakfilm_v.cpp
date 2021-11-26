@@ -55,14 +55,10 @@ public:
     std::string to_string() const override {
         PYBIND11_OVERLOAD_PURE(std::string, StreakFilm, to_string, );
     }
-
-    ref<StreakImageBlock> getStreakImageBlock() const override {
-        PYBIND11_OVERLOAD_PURE(ref<StreakImageBlock>, StreakFilm, getStreakImageBlock, );
-    }
 };
 
-// TODO: refactor this not to use PyStreakFilm (trampoline) because the problem
-//       of StreakHDRFilm not being the correct class was in main_v.cpp
+// TODO(jorge): refactor this not to use PyStreakFilm (trampoline) because
+// the problem of StreakHDRFilm not being the correct class was in main_v.cpp
 MTS_PY_EXPORT(StreakFilm) {
     MTS_PY_IMPORT_TYPES(StreakFilm, Film)
     using PyStreakFilm = PyStreakFilm<Float, Spectrum>;
@@ -75,8 +71,7 @@ MTS_PY_EXPORT(StreakFilm) {
         .def_method(StreakFilm, num_bins)
         .def_method(StreakFilm, bin_width_opl)
         .def_method(StreakFilm, start_opl)
-        .def_method(StreakFilm, time_reconstruction_filter)
-        .def_method(StreakFilm, getStreakImageBlock);
+        .def_method(StreakFilm, time_reconstruction_filter);
 
     MTS_PY_REGISTER_OBJECT("register_streakfilm", StreakFilm)
 }

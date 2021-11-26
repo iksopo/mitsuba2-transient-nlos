@@ -491,8 +491,6 @@ public:
         return oss.str();
     }
 
-    ref<StreakImageBlock> getStreakImageBlock() const override { return m_storage; }
-
     MTS_DECLARE_CLASS()
 protected:
     Bitmap::FileFormat m_file_format;

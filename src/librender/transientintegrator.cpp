@@ -191,7 +191,7 @@ MTS_VARIANT bool TransientSamplingIntegrator<Float, Spectrum>::render(Scene *sce
                                 Float(idx / uint32_t(film_size[0])));
         pos += block->offset();
 
-        // TODO: fix for GPU
+        // TODO(jorge): fix for GPU
         std::vector<Float> aovs(channels.size());
 
         for (size_t i = 0; i < n_passes; i++)
@@ -212,7 +212,7 @@ MTS_VARIANT void TransientSamplingIntegrator<Float, Spectrum>::render_block(cons
                                                                    const Sensor *sensor,
                                                                    Sampler *sampler,
                                                                    StreakImageBlock *block,
-                                                                   std::vector<FloatTimeSample<Float, Mask>> &aovsRecordVector,
+                                                                   std::vector<FloatTimeSample<Float, Mask>> &aovs_record,
                                                                    size_t sample_count_,
                                                                    size_t block_id) const {
     block->clear();
@@ -233,9 +233,9 @@ MTS_VARIANT void TransientSamplingIntegrator<Float, Spectrum>::render_block(cons
 
             pos += block->offset();
             for (uint32_t j = 0; j < sample_count && !should_stop(); ++j) {
-                render_sample(scene, sensor, sampler, block, aovsRecordVector,
+                render_sample(scene, sensor, sampler, block, aovs_record,
                               pos, diff_scale_factor);
-                aovsRecordVector.clear();
+                aovs_record.clear();
             }
         }
     } else if constexpr (is_array_v<Float> && !is_cuda_array_v<Float>) {
@@ -250,14 +250,13 @@ MTS_VARIANT void TransientSamplingIntegrator<Float, Spectrum>::render_block(cons
             Point2u pos = enoki::morton_decode<Point2u>(index / UInt32(sample_count));
             active &= !any(pos >= block->size());
             pos += block->offset();
-            render_sample(scene, sensor, sampler, block, aovsRecordVector, pos, diff_scale_factor, active);
-            aovsRecordVector.clear();
+            render_sample(scene, sensor, sampler, block, aovs_record, pos, diff_scale_factor, active);
+            aovs_record.clear();
         }
     } else {
         ENOKI_MARK_USED(scene);
         ENOKI_MARK_USED(sensor);
-        // TODO: take care what to do with this
-        // ENOKI_MARK_USED(aovs);
+        ENOKI_MARK_USED(aovs_record);
         ENOKI_MARK_USED(diff_scale_factor);
         ENOKI_MARK_USED(pixel_count);
         ENOKI_MARK_USED(sample_count);
@@ -304,18 +303,7 @@ TransientSamplingIntegrator<Float, Spectrum>::render_sample(const Scene *scene,
 
     const Medium *medium = sensor->medium();
     std::vector<RadianceSample<Float, Spectrum, Mask>> timed_samples_record;
-    // TODO(jorge): look if aovs + 5 is a in/out parameter for a single sample, because in that case now it does not work
     sample(scene, sampler, ray, medium, aovs_record, timed_samples_record, max_opl, active);
-
-    /**
-    // Si lo sumo aquí, va bien y la foto tiene sentido
-    Spectrum radiance(0.f);
-    std::vector<RadianceSample<Float, Spectrum, Mask>> vvv;
-    for(const auto &radianceSample : radianceSamplesRecordVector) {
-        radiance[radianceSample.mask] += radianceSample.radiance;
-    }
-    vvv.emplace_back(0.f, radiance, true);
-     **/
 
     std::vector<RadianceSample<Float, UnpolarizedSpectrum, Mask>> radianceSampleVector_u = {};
     for(const auto &radianceSampleRecord : timed_samples_record) {
@@ -354,16 +342,6 @@ TransientSamplingIntegrator<Float, Spectrum>::render_sample(const Scene *scene,
             );
         }
     }
-
-    /**
-    // Si lo sumo aquí, va bien y la foto tiene sentido
-    Color3f radiance(0.f);
-    std::vector<RadianceSample<Float, Color3f, Mask>> vvv;
-    for(const auto &radianceSample : xyzVector) {
-        radiance[radianceSample.mask] += radianceSample.radiance;
-    }
-    vvv.emplace_back(0.f, radiance, true);
-     **/
 
     // Either there are no aovs samples because the integrator does not produce
     // aovs and the aov vector is empty or the integrator produces aovs and

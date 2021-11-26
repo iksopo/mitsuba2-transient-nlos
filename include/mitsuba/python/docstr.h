@@ -5890,8 +5890,6 @@ static const char *__doc_mitsuba_StreakFilm_class = R"doc()doc";
 
 static const char *__doc_mitsuba_StreakFilm_bin_width_opl = R"doc()doc";
 
-static const char *__doc_mitsuba_StreakFilm_getStreakImageBlock = R"doc()doc";
-
 static const char *__doc_mitsuba_StreakFilm_m_bin_width_opl = R"doc()doc";
 
 static const char *__doc_mitsuba_StreakFilm_m_num_bins = R"doc()doc";

@@ -26,7 +26,7 @@ StreakImageBlock<Float, Spectrum>::StreakImageBlock(
         m_weights_y     = m_weights_x + filter_size;
     }
 
-    // TODO: initialize also the time_filter
+    // TODO(jorge): initialize also the time_filter
 
     set_size(size, time);
 }
@@ -96,12 +96,12 @@ StreakImageBlock<Float, Spectrum>::put(
     const Point2f &pos_, const std::vector<FloatTimeSample<Float, Mask>> &values) {
     ScopedPhase sp(ProfilerPhase::ImageBlockPut);
     Assert(m_filter != nullptr);
-    // TODO: assert m_time_filter != nullptr and use it later
+    // TODO(jorge): assert m_time_filter != nullptr and use it later
 
-    for (const auto &radianceSample : values) {
-        Mask active = radianceSample.mask;
+    for (const auto &radiance_sample : values) {
+        Mask active = radiance_sample.mask;
         // Convert t to bin
-        Float pos_sensor      = (radianceSample.opl - m_time_offset) / m_exposure_time;
+        Float pos_sensor      = (radiance_sample.opl - m_time_offset) / m_exposure_time;
         Int32 pos_sensor_int = floor2int<Int32>(pos_sensor);
 
         // Check if all sample values are valid
@@ -110,19 +110,19 @@ StreakImageBlock<Float, Spectrum>::put(
 
             if (m_warn_negative) {
                 for (uint32_t k = 0; k < m_channel_count; ++k)
-                    is_valid &= radianceSample.values[k] >= -1e-5f;
+                    is_valid &= radiance_sample.values[k] >= -1e-5f;
             }
 
             if (m_warn_invalid) {
                 for (uint32_t k = 0; k < m_channel_count; ++k)
-                    is_valid &= enoki::isfinite(radianceSample.values[k]);
+                    is_valid &= enoki::isfinite(radiance_sample.values[k]);
             }
 
             if (unlikely(any(active && !is_valid))) {
                 std::ostringstream oss;
                 oss << "Invalid sample value: [";
                 for (uint32_t i = 0; i < m_channel_count; ++i) {
-                    oss << radianceSample.values[i];
+                    oss << radiance_sample.values[i];
                     if (i + 1 < m_channel_count)
                         oss << ", ";
                 }
@@ -183,7 +183,7 @@ StreakImageBlock<Float, Spectrum>::put(
 
                     enabled &= x <= hi.x();
                     ENOKI_NOUNROLL for (uint32_t k = 0; k < m_channel_count; ++k)
-                        scatter_add(m_data, radianceSample.values[k] * weight, offset + k, enabled);
+                        scatter_add(m_data, radiance_sample.values[k] * weight, offset + k, enabled);
                 }
             }
         } else {
@@ -192,7 +192,7 @@ StreakImageBlock<Float, Spectrum>::put(
                                                lo.x() * m_time + pos_sensor_int);
             Mask enabled  = active && all(lo >= 0u && lo < size);
             ENOKI_NOUNROLL for (uint32_t k = 0; k < m_channel_count; ++k)
-                scatter_add(m_data, radianceSample.values[k], offset + k, enabled);
+                scatter_add(m_data, radiance_sample.values[k], offset + k, enabled);
         }
     }
 }

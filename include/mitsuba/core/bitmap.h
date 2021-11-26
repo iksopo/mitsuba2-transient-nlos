@@ -716,15 +716,10 @@ void accumulate_2d(ConstT source,
 }
 
 template <typename T, typename ConstT>
-void accumulate_3d(ConstT source,
-                   Vector<int, 2> source_size,
-                   uint32_t source_time,
-                   T target,
-                   Vector<int, 2> target_size,
-                   uint32_t target_time,
-                   Point<int, 2> source_offset,
-                   Point<int, 2> target_offset,
-                   Vector<int, 2> size,
+void accumulate_3d(ConstT source, Vector<int, 2> source_size,
+                   uint32_t source_time, T target, Vector<int, 2> target_size,
+                   uint32_t target_time, Point<int, 2> source_offset,
+                   Point<int, 2> target_offset, Vector<int, 2> size,
                    size_t channel_count) {
     using Value = std::decay_t<T>;
     assert(source_time == target_time);
@@ -745,8 +740,12 @@ void accumulate_3d(ConstT source,
         constexpr Value maxval = std::numeric_limits<Value>::max();
         ENOKI_MARK_USED(maxval);
 
-        source += (source_offset.x() + source_offset.y() * (size_t) source_size.x()) * source_time * channel_count;
-        target += (target_offset.x() + target_offset.y() * (size_t) target_size.x()) * source_time * channel_count;
+        source +=
+            (source_offset.x() + source_offset.y() * (size_t) source_size.x()) *
+            source_time * channel_count;
+        target +=
+            (target_offset.x() + target_offset.y() * (size_t) target_size.x()) *
+            source_time * channel_count;
 
         for (int y = 0; y < size.y(); ++y) {
             for (int i = 0; i < n; ++i) {
@@ -763,19 +762,19 @@ void accumulate_3d(ConstT source,
         using Int32 = int32_array_t<Value>;
         Int32 index = arange<Int32>(n * size.y());
 
-        Int32 y   = index / n,
-            col = index - y * n;
+        Int32 y = index / n, col = index - y * n;
 
-        Int32 index_source = col + (source_offset.x() + source_size.x() * (y + source_offset.y())) * source_time *
-                                   channel_count,
-            index_target = col + (target_offset.x() + target_size.x() * (y + target_offset.y())) * target_time *
-                                 channel_count;
+        Int32 index_source = col + (source_offset.x() +
+                                    source_size.x() * (y + source_offset.y())) *
+                                       source_time * channel_count,
+              index_target = col + (target_offset.x() +
+                                    target_size.x() * (y + target_offset.y())) *
+                                       target_time * channel_count;
 
-        scatter(
-            target,
-            gather<Value>(source, index_source) + gather<Value>(target, index_target),
-            index_target
-        );
+        scatter(target,
+                gather<Value>(source, index_source) +
+                    gather<Value>(target, index_target),
+                index_target);
     }
 }
 

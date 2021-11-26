@@ -14,8 +14,6 @@ NAMESPACE_BEGIN(mitsuba)
  *
  * \remark Time is stored as optical path length (i.e. distance * medium_ior),
  * because speed of light is big
- *
- * TODO(jorge): see if this should have an interface to be called from Python
  */
 template <typename Float, typename Spectrum, typename Mask>
 struct MTS_EXPORT_RENDER RadianceSample {

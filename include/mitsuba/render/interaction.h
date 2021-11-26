@@ -200,11 +200,10 @@ struct SurfaceInteraction : Interaction<Float_, Spectrum_> {
     }
 
     /**
-     * \brief Distance from the ray origin to the intersection point in the surface
+     * \brief Distance from the ray origin to the intersection point in the
+     * surface
      */
-    Float distance(const Ray3f &ray) const {
-        return norm(p - ray.o);
-    }
+    Float distance(const Ray3f &ray) const { return norm(p - ray.o); }
 
     /**
      * \brief Returns the BSDF of the intersected shape.

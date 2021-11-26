@@ -191,7 +191,11 @@ public:
                         // NOTE(diego): as points are not randomly chosen,
                         // we need to account for d^2 and cos term because of
                         // the solid angle projection of si.p to
-                        // nlos_laser_target. The incident cos term at
+                        // nlos_laser_target.
+                        // This is like a point light, but the extra cos term
+                        // as it is not a point light that emits in all
+                        // directions :^)
+                        // The incident cos term at
                         // nlos_laser_target will be taken into account by
                         // f_emitter_sample's bsdf
                         bsdf_val *= sqr(rcp(dist)) * Frame3f::cos_theta(wo);
