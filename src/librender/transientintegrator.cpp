@@ -36,7 +36,7 @@ MTS_VARIANT TransientSamplingIntegrator<Float, Spectrum>::TransientSamplingInteg
         m_block_size = block_size;
     }
 
-    m_samples_per_pass = (uint32_t) props.size_("samples_per_pass", (size_t) -1);
+    m_samples_per_pass = (uint32_t) props.size_("samples_per_pass", (uint32_t) -1);
     m_timeout = props.float_("timeout", -1.f);
 
     /// Disable direct visibility of emitters if needed
@@ -60,9 +60,11 @@ MTS_VARIANT bool TransientSamplingIntegrator<Float, Spectrum>::render(Scene *sce
     ref<StreakFilm> film = dynamic_cast<StreakFilm *>(sensor->film());
     ScalarVector2i film_size = film->crop_size();
 
-    size_t total_spp        = sensor->sampler()->sample_count();
-    size_t samples_per_pass = (m_samples_per_pass == (size_t) -1)
-                               ? total_spp : std::min((size_t) m_samples_per_pass, total_spp);
+    uint32_t total_spp = sensor->sampler()->sample_count();
+    uint32_t samples_per_pass =
+        (m_samples_per_pass == (uint32_t) -1)
+            ? total_spp
+            : std::min((uint32_t) m_samples_per_pass, total_spp);
     if ((total_spp % samples_per_pass) != 0)
         Throw("sample_count (%d) must be a multiple of samples_per_pass (%d).",
               total_spp, samples_per_pass);
@@ -145,7 +147,7 @@ MTS_VARIANT bool TransientSamplingIntegrator<Float, Spectrum>::render(Scene *sce
                                                  (n_divs - 1) * samples_per_div)
                                               : samples_per_div;
 
-                        std::vector<FloatTimeSample<Float, Mask>> aovs_record;
+                        std::vector<FloatSample<Float>> aovs_record;
                         render_block(scene, sensor, sampler, block, aovs_record,
                                      n_samples, block_id * n_divs + div);
 
@@ -212,7 +214,7 @@ MTS_VARIANT void TransientSamplingIntegrator<Float, Spectrum>::render_block(cons
                                                                    const Sensor *sensor,
                                                                    Sampler *sampler,
                                                                    StreakImageBlock *block,
-                                                                   std::vector<FloatTimeSample<Float, Mask>> &aovs_record,
+                                                                   std::vector<FloatSample<Float>> &aovs_record,
                                                                    size_t sample_count_,
                                                                    size_t block_id) const {
     block->clear();
@@ -269,7 +271,7 @@ TransientSamplingIntegrator<Float, Spectrum>::render_sample(const Scene *scene,
                                                    const Sensor *sensor,
                                                    Sampler *sampler,
                                                    StreakImageBlock *block,
-                                                   std::vector<FloatTimeSample<Float, Mask>> &aovs_record,
+                                                   std::vector<FloatSample<Float>> &aovs_record,
                                                    const Vector2f &pos,
                                                    ScalarFloat diff_scale_factor,
                                                    Mask active) const {
@@ -302,46 +304,9 @@ TransientSamplingIntegrator<Float, Spectrum>::render_sample(const Scene *scene,
     ray.scale_differential(diff_scale_factor);
 
     const Medium *medium = sensor->medium();
-    std::vector<RadianceSample<Float, Spectrum, Mask>> timed_samples_record;
-    sample(scene, sampler, ray, medium, aovs_record, timed_samples_record, max_opl, active);
-
-    std::vector<RadianceSample<Float, UnpolarizedSpectrum, Mask>> radianceSampleVector_u = {};
-    for(const auto &radianceSampleRecord : timed_samples_record) {
-        radianceSampleVector_u.emplace_back(
-            radianceSampleRecord.opl,
-            depolarize(radianceSampleRecord.radiance * ray_weight),
-            radianceSampleRecord.mask
-        );
-    }
-    std::vector<RadianceSample<Float, Color3f, Mask>> xyzVector;
-    if constexpr (is_monochromatic_v<Spectrum>) {
-        ENOKI_MARK_USED(ray.wavelengths);
-        for(const auto &radianceSampleRecord_u : radianceSampleVector_u) {
-            xyzVector.emplace_back(
-                radianceSampleRecord_u.opl,
-                radianceSampleRecord_u.radiance.x(),
-                radianceSampleRecord_u.mask
-            );
-        }
-    } else if constexpr (is_rgb_v<Spectrum>) {
-        ENOKI_MARK_USED(ray.wavelengths);
-        for(const auto &radianceSampleRecord_u : radianceSampleVector_u) {
-            xyzVector.emplace_back(
-                radianceSampleRecord_u.opl,
-                srgb_to_xyz(radianceSampleRecord_u.radiance, radianceSampleRecord_u.mask),
-                radianceSampleRecord_u.mask
-            );
-        }
-    } else {
-        static_assert(is_spectral_v<Spectrum>);
-        for(const auto &radianceSampleRecord_u : radianceSampleVector_u) {
-            xyzVector.emplace_back(
-                radianceSampleRecord_u.opl,
-                spectrum_to_xyz(radianceSampleRecord_u.radiance, ray.wavelengths, radianceSampleRecord_u.mask),
-                radianceSampleRecord_u.mask
-            );
-        }
-    }
+    std::vector<RadianceSample<Float, Spectrum>> timed_samples_record;
+    sample(scene, sampler, ray, medium, aovs_record, timed_samples_record,
+           max_opl, active);
 
     // Either there are no aovs samples because the integrator does not produce
     // aovs and the aov vector is empty or the integrator produces aovs and
@@ -349,74 +314,48 @@ TransientSamplingIntegrator<Float, Spectrum>::render_sample(const Scene *scene,
     // each radiance sample)
     assert(aovs_record.empty() ||
            (aovs_record.size() == timed_samples_record.size()));
-    if(aovs_record.empty()) {
-        for(const auto &xyzRecord: xyzVector) {
-            FloatTimeSample<Float, Mask> color(xyzRecord.opl, xyzRecord.mask);
-            // Reversed
-            color.push_front(select(xyzRecord.mask, Float(1.f), Float(0.f)));
-            color.push_front(xyzRecord.radiance.z());
-            color.push_front(xyzRecord.radiance.y());
-            color.push_front(xyzRecord.radiance.x());
-            aovs_record.push_back(color);
-        }
-    } else {
-        for (int i = 0; i < aovs_record.size(); ++i) {
-            aovs_record[i].push_front(select(xyzVector[i].mask, Float(1.f), Float(0.f)));
-            aovs_record[i].push_front(xyzVector[i].radiance.z());
-            aovs_record[i].push_front(xyzVector[i].radiance.y());
-            aovs_record[i].push_front(xyzVector[i].radiance.x());
+    ENOKI_MARK_USED(ray.wavelengths);
+    if (aovs_record.empty()) {
+        for (size_t i = 0; i < timed_samples_record.size(); ++i) {
+            aovs_record.push_back(FloatSample<Float>(
+                timed_samples_record[i].opl, timed_samples_record[i].mask));
         }
     }
+    for (size_t i = 0; i < timed_samples_record.size(); ++i) {
+        auto &radiance_sample = timed_samples_record[i];
+        auto &radiance        = radiance_sample.radiance;
+        const auto &mask      = radiance_sample.mask;
 
-    std::vector<RadianceSample<Float, std::array<Float, 5>, Mask>> values;
-    for(const auto &xyzRecord: xyzVector) {
-        std::array<Float, 5> color;
-        color[0] = xyzRecord.radiance.x();
-        color[1] = xyzRecord.radiance.y();
-        color[2] = xyzRecord.radiance.z();
-        color[3] = select(xyzRecord.mask, Float(1.f), Float(0.f));
-        color[4] = 1.f;
-        values.emplace_back(xyzRecord.opl, color, xyzRecord.mask);
+        radiance                   = ray_weight * radiance;
+        UnpolarizedSpectrum spec_u = depolarize(radiance);
+        Color3f xyz;
+        if constexpr (is_monochromatic_v<Spectrum>) {
+            xyz = spec_u.x();
+        } else if constexpr (is_rgb_v<Spectrum>) {
+            xyz = srgb_to_xyz(spec_u, mask);
+        } else {
+            static_assert(is_spectral_v<Spectrum>);
+            xyz = spectrum_to_xyz(spec_u, ray.wavelengths, mask);
+        }
+
+        // XYZA pushed backwards
+        aovs_record[i].push_front(select(mask, Float(1.f), Float(0.f)));
+        aovs_record[i].push_front(xyz.z());
+        aovs_record[i].push_front(xyz.y());
+        aovs_record[i].push_front(xyz.x());
     }
 
     block->put(position_sample, aovs_record);
 
-    /**
-    radiance.first = ray_weight * radiance.first;
-
-    UnpolarizedSpectrum spec_u = depolarize(radiance.first);
-
-    Color3f xyz;
-    if constexpr (is_monochromatic_v<Spectrum>) {
-        xyz = spec_u.x();
-    } else if constexpr (is_rgb_v<Spectrum>) {
-        xyz = srgb_to_xyz(spec_u, active);
-    } else {
-        static_assert(is_spectral_v<Spectrum>);
-        xyz = spectrum_to_xyz(spec_u, ray.wavelengths, active);
-    }
-
-    aovs[0] = xyz.x();
-    aovs[1] = xyz.y();
-    aovs[2] = xyz.z();
-    aovs[3] = select(radiance.second, Float(1.f), Float(0.f));
-    aovs[4] = 1.f;
-
-    block->put(position_sample, aovs, active);
-     **/
-
     sampler->advance();
 }
 
-MTS_VARIANT void
-TransientSamplingIntegrator<Float, Spectrum>::sample(const Scene * /* scene */,
-                                            Sampler * /* sampler */,
-                                            const RayDifferential3f & /* ray */,
-                                            const Medium * /* medium */,
-                                            std::vector<FloatTimeSample<Float, Mask>> & /* aovs_record */,
-                                            std::vector<RadianceSample<Float, Spectrum, Mask>> & /* timed_samples_record */,
-                                            Float /* max_path_opl */,
-                                            Mask /* active */) const {
+MTS_VARIANT void TransientSamplingIntegrator<Float, Spectrum>::sample(
+    const Scene * /* scene */, Sampler * /* sampler */,
+    const RayDifferential3f & /* ray */, const Medium * /* medium */,
+    std::vector<FloatSample<Float>> & /* aovs_record */,
+    std::vector<RadianceSample<Float, Spectrum>> & /* timed_samples_record */,
+    Float /* max_path_opl */, Mask /* active */) const {
     NotImplementedError("sample");
 }
 

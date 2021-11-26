@@ -116,8 +116,8 @@ public:
                         Sampler *sampler,
                         const RayDifferential3f &ray,
                         const Medium *medium = nullptr,
-                        std::vector<FloatTimeSample<Float, Mask>> &aovs_record = {},
-                        std::vector<RadianceSample<Float, Spectrum, Mask>> &timed_samples_record = {},
+                        std::vector<FloatSample<Float>> &aovs_record = {},
+                        std::vector<RadianceSample<Float, Spectrum>> &timed_samples_record = {},
                         Float max_path_opl = math::Infinity<Float>,
                         Mask active = true) const;
 
@@ -158,12 +158,12 @@ protected:
 
     virtual void render_block(const Scene *scene, const Sensor *sensor,
                               Sampler *sampler, StreakImageBlock *block,
-                              std::vector<FloatTimeSample<Float, Mask>> &aovsRecordVector,
+                              std::vector<FloatSample<Float>> &aovs_record,
                               size_t sample_count, size_t block_id) const;
 
     void render_sample(const Scene *scene, const Sensor *sensor,
                        Sampler *sampler, StreakImageBlock *block,
-                       std::vector<FloatTimeSample<Float, Mask>> &aovsRecordVector,
+                       std::vector<FloatSample<Float>> &aovs_record,
                        const Vector2f &pos, ScalarFloat diff_scale_factor,
                        Mask active = true) const;
 

@@ -181,7 +181,7 @@ public:
         m_channels = channels;
     }
 
-    void put(const ImageBlock *block) override {
+    void put(const ImageBlock * /* block */) override {
         NotImplementedError("put");
     }
 

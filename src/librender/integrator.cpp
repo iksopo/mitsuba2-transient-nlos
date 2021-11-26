@@ -55,9 +55,11 @@ MTS_VARIANT bool SamplingIntegrator<Float, Spectrum>::render(Scene *scene, Senso
     ref<Film> film = sensor->film();
     ScalarVector2i film_size = film->crop_size();
 
-    size_t total_spp        = sensor->sampler()->sample_count();
-    size_t samples_per_pass = (m_samples_per_pass == (size_t) -1)
-                               ? total_spp : std::min((size_t) m_samples_per_pass, total_spp);
+    uint32_t total_spp = sensor->sampler()->sample_count();
+    uint32_t samples_per_pass =
+        (m_samples_per_pass == (uint32_t) -1)
+            ? total_spp
+            : std::min((uint32_t) m_samples_per_pass, total_spp);
     if ((total_spp % samples_per_pass) != 0)
         Throw("sample_count (%d) must be a multiple of samples_per_pass (%d).",
               total_spp, samples_per_pass);

@@ -22,6 +22,8 @@ std::string escape_html(const std::string& data) {
     return buffer;
 }
 
+#pragma GCC diagnostic push
+#pragma GCC diagnostic ignored "-Wattributes"
 class JupyterNotebookAppender : public Appender {
 public:
     JupyterNotebookAppender() {
@@ -87,6 +89,7 @@ private:
     py::object m_bar;
     py::object m_label;
 };
+#pragma GCC diagnostic pop
 
 MTS_PY_EXPORT(ProgressReporter) {
     /* Install a custom appender for log + progress messages if Mitsuba is

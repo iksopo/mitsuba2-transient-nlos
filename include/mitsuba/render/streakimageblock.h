@@ -103,7 +103,7 @@ public:
      * \param wavelengths
      *    Sample wavelengths in nanometers
      *
-     * \param radianceSampleVector
+     * \param timed_samples_record
      *    Samples value associated with the specified wavelengths
      *
      * \param alpha
@@ -113,58 +113,18 @@ public:
      *    NaN or negative. A warning is also printed if \c m_warn_negative
      *    or \c m_warn_invalid is enabled.
      */
-    void put(const Point2f &pos,
-             const Wavelength &wavelengths,
-             const std::vector<RadianceSample<Float, Spectrum, Mask>> &radianceSampleVector,
-             const Float &alpha) {
-        if (unlikely(m_channel_count != 4))
-            Throw("StreakImageBlock::put(): non-standard image block configuration! (AOVs?)");
-        std::vector<RadianceSample<Float, UnpolarizedSpectrum, Mask>> radianceSampleVector_u = {};
-        for (const auto &radianceSampleRecord : radianceSampleVector) {
-            radianceSampleVector_u.emplace_back(
-                radianceSampleRecord.opl,
-                depolarize(radianceSampleRecord.radiance),
-                radianceSampleRecord.mask);
-        }
-        std::vector<RadianceSample<Float, Color3f, Mask>> xyzVector;
-        if constexpr (is_monochromatic_v<Spectrum>) {
-            ENOKI_MARK_USED(wavelengths);
-            for (const auto &radianceSampleRecord_u : radianceSampleVector_u) {
-                xyzVector.emplace_back(radianceSampleRecord_u.time(),
-                                       radianceSampleRecord_u.radiance.x(),
-                                       radianceSampleRecord_u.mask);
-            }
-        } else if constexpr (is_rgb_v<Spectrum>) {
-            ENOKI_MARK_USED(wavelengths);
-            for (const auto &radianceSampleRecord_u : radianceSampleVector_u) {
-                xyzVector.emplace_back(
-                    radianceSampleRecord_u.time(),
-                    srgb_to_xyz(radianceSampleRecord_u.radiance,
-                                radianceSampleRecord_u.mask),
-                    radianceSampleRecord_u.mask);
-            }
-        } else {
-            static_assert(is_spectral_v<Spectrum>);
-            for (const auto &radianceSampleRecord_u : radianceSampleVector_u) {
-                xyzVector.emplace_back(
-                    radianceSampleRecord_u.time(),
-                    spectrum_to_xyz(radianceSampleRecord_u.radiance,
-                                    wavelengths, radianceSampleRecord_u.mask),
-                    radianceSampleRecord_u.mask);
-            }
-        }
-
-        std::vector<FloatTimeSample<Float, Mask>> values;
-        for(const auto &xyzRecord: xyzVector) {
-            FloatTimeSample<Float, Mask> color(xyzRecord.opl, xyzRecord.mask);
-            // Reversed
-            color.push_front(select(xyzRecord.mask, Float(1.f), Float(0.f)));
-            color.push_front(xyzRecord.radiance.z());
-            color.push_front(xyzRecord.radiance.y());
-            color.push_front(xyzRecord.radiance.x());
-            values.push_back(color);
-        }
-        put(pos, values);
+    void put(const Point2f & /* pos */,
+             const Wavelength & /* wavelengths */,
+             const std::vector<RadianceSample<Float, Spectrum>> & /* timed_samples_record */,
+             const std::vector<Float> & /* alpha */) {
+        // NOTE(diego): transientintegrator.cpp::render_sample
+        // uses the other function, so this is unused for now
+        // If you need to implement this you can copy most of the required code
+        // that converts from timed_samples_record to
+        // std::vector<FloatSample<Float>> (values) and call the function below
+        // Note that the alpha parameter is related to the mask found in
+        // timed_samples_record, so you can probably remove that too
+        NotImplementedError("put");
     }
 
 
@@ -184,7 +144,7 @@ public:
      *    of the sample values. The array length of each sample must match the
      *    length given by \ref channel_count()
      */
-    void put(const Point2f &pos, const std::vector<FloatTimeSample<Float, Mask>> &values);
+    void put(const Point2f &pos, const std::vector<FloatSample<Float>> &values);
 
     /// Clear everything to zero.
     void clear();

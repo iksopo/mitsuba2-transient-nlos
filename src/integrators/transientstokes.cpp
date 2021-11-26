@@ -27,8 +27,8 @@ public:
 
     void sample(const Scene *scene, Sampler *sampler,
                 const RayDifferential3f &ray, const Medium *medium,
-                std::vector<FloatTimeSample<Float, Mask>> &aovs_record,
-                std::vector<RadianceSample<Float, Spectrum, Mask>>
+                std::vector<FloatSample<Float>> &aovs_record,
+                std::vector<RadianceSample<Float, Spectrum>>
                     &timed_samples_record,
                 Float max_path_opl, Mask active) const override {
         MTS_MASKED_FUNCTION(ProfilerPhase::SamplingIntegratorSample, active);
@@ -45,7 +45,7 @@ public:
 
         if(aovs_record.empty()) {
             for (const auto &result : timed_samples_record) {
-                FloatTimeSample<Float, Mask> color(result.opl, result.mask);
+                FloatSample<Float> color(result.opl, result.mask);
                 if constexpr (is_polarized_v<Spectrum>) {
                     auto const &stokes = result.radiance.coeff(0);
                     for (int i = 3; i >= 0; --i) {
@@ -74,7 +74,7 @@ public:
                 aovs_record.push_back(color);
             }
         } else {
-            for (int i = 0; i < aovs_record.size(); ++i) {
+            for (size_t i = 0; i < aovs_record.size(); ++i) {
                 if constexpr (is_polarized_v<Spectrum>) {
                     auto const &stokes = timed_samples_record[i].radiance.coeff(0);
                     for (int i = 3; i >= 0; --i) {

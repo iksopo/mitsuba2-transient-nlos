@@ -15,8 +15,10 @@ NAMESPACE_BEGIN(mitsuba)
  * \remark Time is stored as optical path length (i.e. distance * medium_ior),
  * because speed of light is big
  */
-template <typename Float, typename Spectrum, typename Mask>
+template<typename Float, typename Spectrum>
 struct MTS_EXPORT_RENDER RadianceSample {
+    MTS_IMPORT_CORE_TYPES()
+
     Float opl;
     Spectrum radiance;
     Mask mask;
@@ -40,13 +42,15 @@ struct MTS_EXPORT_RENDER RadianceSample {
  * \remark Time is stored as optical path length (i.e. distance * medium_ior),
  * because speed of light is big
  */
-template <typename Float, typename Mask>
-struct MTS_EXPORT_RENDER FloatTimeSample {
+template<typename Float>
+struct MTS_EXPORT_RENDER FloatSample {
+    MTS_IMPORT_CORE_TYPES()
+
     Float opl;
     std::deque<Float> values;
     Mask mask;
 
-    FloatTimeSample(Float opl, Mask mask) : opl(opl), mask(mask) {}
+    FloatSample(Float opl, Mask mask) : opl(opl), mask(mask) {}
 
     void push_front(Float value) { values.push_front(value); }
 

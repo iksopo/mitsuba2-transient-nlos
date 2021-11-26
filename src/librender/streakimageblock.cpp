@@ -93,7 +93,7 @@ StreakImageBlock<Float, Spectrum>::put(const StreakImageBlock *block) {
 
 MTS_VARIANT void
 StreakImageBlock<Float, Spectrum>::put(
-    const Point2f &pos_, const std::vector<FloatTimeSample<Float, Mask>> &values) {
+    const Point2f &pos_, const std::vector<FloatSample<Float>> &values) {
     ScopedPhase sp(ProfilerPhase::ImageBlockPut);
     Assert(m_filter != nullptr);
     // TODO(jorge): assert m_time_filter != nullptr and use it later

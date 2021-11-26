@@ -81,8 +81,8 @@ MTS_VARIANT void StreakFilm<Float, Spectrum>::auto_detect_bins(Scene *scene,
                 ray.scale_differential(diff_scale_factor);
 
                 const Medium *medium = sensor->medium();
-                std::vector<FloatTimeSample<Float, Mask>> aovs_record;
-                std::vector<RadianceSample<Float, Spectrum, Mask>>
+                std::vector<FloatSample<Float>> aovs_record;
+                std::vector<RadianceSample<Float, Spectrum>>
                     timed_samples_record;
                 integrator->sample(scene, sampler, ray, medium, aovs_record,
                                    timed_samples_record, max_opl);

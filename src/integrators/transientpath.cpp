@@ -28,8 +28,8 @@ public:
 
     void sample(const Scene *scene, Sampler *sampler, const RayDifferential3f &ray_,
                 const Medium * /* medium */,
-                std::vector<FloatTimeSample<Float, Mask>> & /* aovs_record */,
-                std::vector<RadianceSample<Float, Spectrum, Mask>> &timed_samples_record,
+                std::vector<FloatSample<Float>> & /* aovs_record */,
+                std::vector<RadianceSample<Float, Spectrum>> &timed_samples_record,
                 Float max_path_opl,
                 Mask active) const override {
         MTS_MASKED_FUNCTION(ProfilerPhase::SamplingIntegratorSample, active);
@@ -109,7 +109,7 @@ public:
                     [*this](const Scene *scene, Sampler *sampler,
                             BSDFContext &ctx, SurfaceInteraction3f &si,
                             Mask &active_e,
-                            std::vector<RadianceSample<Float, Spectrum, Mask>>
+                            std::vector<RadianceSample<Float, Spectrum>>
                                 &timed_samples_record,
                             const BSDFPtr &bsdf, const Spectrum &throughput,
                             const Float &path_opl, const Float &current_ior,

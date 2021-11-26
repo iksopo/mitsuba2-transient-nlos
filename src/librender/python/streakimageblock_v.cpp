@@ -15,21 +15,22 @@ MTS_PY_EXPORT(StreakImageBlock) {
             D(StreakImageBlock, put), "block"_a)
         /**
         .def("put",
-             // TODO: for this version, vectorize has been deleted
-             // TODO: check if it is possible to declare values as a vector of RadianceSample directly so there is no need to iterate to transform them (an thus, no need for the wrapper)
+             // TODO(jorge): for this version, vectorize has been deleted
+             // TODO(jorge): check if it is possible to declare values as a vector of RadianceSample directly so there is no need to iterate to transform them (an thus, no need for the wrapper)
              [](StreakImageBlock &ib, const Point2f &pos, const wavelength_t<Spectrum> &wavelengths,
                  const std::vector<std::tuple<Float, Spectrum, Mask>> &values, const Float &alpha) {
-               std::vector<RadianceSample<Float, Spectrum, Mask>> values_transformed;
+               std::vector<RadianceSample<Float, Spectrum>> values_transformed;
                for(const auto &[time, data, mask] : values) {
                    values_transformed.emplace_back(time, data, mask);
                }
                ib.put(pos, wavelengths, values_transformed, alpha);
              }, "pos"_a, "wavelengths"_a, "radianceSamplesRecordVector"_a, "alpha"_a = 1.f)
         .def("put",
-            // TODO: check if it is possible to declare values as a vector of RadianceSample directly so there is no need to iterate to transform them (an thus, no need for the wrapper)
+            // TODO(jorge): check if it is possible to declare values as a vector of RadianceSample directly so there is no need to iterate to transform them (an thus, no need for the wrapper)
+            // NOTE(diego): array should be of len 4 after XYZAW->XYZA
             [](StreakImageBlock &ib, const Point2f &pos,
                 const std::vector<std::tuple<Float, std::vector<Float>, Mask>> &values) {
-                std::vector<RadianceSample<Float, std::array<Float, 5>, Mask>> values_transformed;
+                std::vector<RadianceSample<Float, std::array<Float, 5>>> values_transformed;
                 for(const auto &[time, data, mask] : values) {
                     std::array<Float, 5> data_array;
                     std::copy_n(data.begin(), 5, data_array.begin());
