@@ -1,95 +1,137 @@
 <img src="https://github.com/mitsuba-renderer/mitsuba2/raw/master/docs/images/logo_plain.png" width="120" height="120" alt="Mitsuba logo">
 
-# Mitsuba Renderer 2
-<!--
-| Documentation   | Linux             | Windows             |
-|      :---:      |       :---:       |        :---:        |
-| [![docs][1]][2] | [![rgl-ci][3]][4] | [![appveyor][5]][6] |
+# Mitsuba 2-NLOS
 
+**Mitsuba 2, extended for transient path tracing and non-line of sight data capture.**
 
-[1]: https://readthedocs.org/projects/mitsuba2/badge/?version=master
-[2]: https://mitsuba2.readthedocs.io/en/latest/src/getting_started/intro.html
-[3]: https://rgl-ci.epfl.ch/app/rest/builds/buildType(id:Mitsuba2_Build)/statusIcon.svg
-[4]: https://rgl-ci.epfl.ch/viewType.html?buildTypeId=Mitsuba2_Build&guest=1
-[5]: https://ci.appveyor.com/api/projects/status/eb84mmtvnt8ko8bh/branch/master?svg=true
-[6]: https://ci.appveyor.com/project/wjakob/mitsuba2/branch/master
--->
-| Documentation   |
-|      :---:      |
-| [![docs][1]][2] |
+## Usage
 
+* Transient path tracing: see [transientintegrator](https://github.com/diegoroyo/mitsuba2/blob/feat-transient/src/librender/transientintegrator.cpp), [transientpath](https://github.com/diegoroyo/mitsuba2/blob/feat-transient/src/integrators/transientpath.cpp) and [transientstokes](https://github.com/diegoroyo/mitsuba2/blob/feat-transient/src/integrators/transientstokes.cpp).
+* Non-line of sight data capture: see [nloscapturemeter](https://github.com/diegoroyo/mitsuba2/blob/feat-transient/src/sensors/nloscapturemeter.cpp) (see documentation)
 
-[1]: https://readthedocs.org/projects/mitsuba2/badge/?version=latest
-[2]: https://mitsuba2.readthedocs.io/en/latest/src/getting_started/intro.html
+<details>
+   <summary>Example scene for line-of-sight capture</summary>
 
-Mitsuba 2 is a research-oriented rendering system written in portable C++17. It
-consists of a small set of core libraries and a wide variety of plugins that
-implement functionality ranging from materials and light sources to complete
-rendering algorithms. Mitsuba 2 strives to retain scene compatibility with its
-predecessor [Mitsuba 0.6](https://github.com/mitsuba-renderer/mitsuba).
-However, in most other respects, it is a completely new system following a
-different set of goals.
+   ```xml
+   <scene version="2.2.1">
+      <!-- Use transientpath integrator -->
+      <integrator type="transientpath">
+         <!-- Discard paths with depth >= max_depth -->
+         <integer name="max_depth" value="4"/>
+      </integrator>
 
-The most significant change of Mitsuba 2 is that it is a *retargetable*
-renderer: this means that the underlying implementations and data structures
-are specified in a generic fashion that can be transformed to accomplish a
-number of different tasks. For example:
+      <!-- Geometry, sensor, etc. -->
+   </scene>
+   ```
+</details>
 
-1. In the simplest case, Mitsuba 2 is an ordinary CPU-based RGB renderer that
-   processes one ray at a time similar to its predecessor [Mitsuba
-   0.6](https://github.com/mitsuba-renderer/mitsuba).
+<details>
+   <summary>Example scene for non-line of sight capture</summary>
 
-2. Alternatively, Mitsuba 2 can be transformed into a differentiable renderer
-   that runs on NVIDIA RTX GPUs. A differentiable rendering algorithm is able
-   to compute derivatives of the entire simulation with respect to input
-   parameters such as camera pose, geometry, BSDFs, textures, and volumes. In
-   conjunction with gradient-based optimization, this opens door to challenging
-   inverse problems including computational material design and scene reconstruction.
+   _Note that variables that start with $ should be changed_
 
-3. Another type of transformation turns Mitsuba 2 into a vectorized CPU
-   renderer that leverages Single Instruction/Multiple Data (SIMD) instruction
-   sets such as AVX512 on modern CPUs to efficiently sample many light paths in
-   parallel.
+   ```xml
+   <scene version="2.2.1">
+      <integrator type="transientpath">
+         <!-- Recommended 1 for progress bar (see path integrator) -->
+         <integer name="block_size" value="1"/>
+         <!-- Discard paths with depth >= max_depth -->
+         <integer name="max_depth" value="4"/>
+         <!-- Only account for paths with depth = filter_depth -->
+         <!-- <integer name="filter_depth" value="3"/> -->
+         <boolean name="discard_direct_paths" value="true"/>
+         <!-- Next event estimation for the laser through the relay wall (recommended true) -->
+         <boolean name="nlos_emitter_sampling" value="true"/>
+      </integrator>
 
-4. Yet another type of transformation rewrites physical aspects of the
-   simulation: Mitsuba can be used as a monochromatic renderer, RGB-based
-   renderer, or spectral renderer. Each variant can optionally account for the
-   effects of polarization if desired.
+      <!-- Relay wall and hidden geometry materials -->
+      <bsdf type="diffuse" id="white">
+         <rgb name="reflectance" value="0.7, 0.7, 0.7"/>
+      </bsdf>
 
-In addition to the above transformations, there are
-several other noteworthy changes:
+      <!-- Hidden geometry -->
+      <shape type="obj">
+         <string name="filename" value="$hidden_mesh_obj"/>
+         <bsdf type="twosided">
+               <ref id="white"/>
+         </bsdf>
 
-1. Mitsuba 2 provides very fine-grained Python bindings to essentially every
-   function using [pybind11](https://github.com/pybind/pybind11). This makes it
-   possible to import the renderer into a Jupyter notebook and develop new
-   algorithms interactively while visualizing their behavior using plots.
+         <transform name="to_world">
+               <scale x="$hidden_scale" y="$hidden_scale" z="$hidden_scale"/>
+               <rotate x="1" angle="$hidden_rot_degrees_x"/>
+               <rotate y="1" angle="$hidden_rot_degrees_y"/>
+               <rotate z="1" angle="$hidden_rot_degrees_z"/>
+               <translate x="0" y="0" z="$hidden_distance_to_wall"/>
+         </transform>
+      </shape>
 
-2. The renderer includes a large automated test suite written in Python, and
-   its development relies on several continuous integration servers that
-   compile and test new commits on different operating systems using various
-   compilation settings (e.g. debug/release builds, single/double precision,
-   etc). Manually checking that external contributions don't break existing
-   functionality had become a severe bottleneck in the previous Mitsuba 0.6
-   codebase, hence the goal of this infrastructure is to avoid such manual
-   checks and streamline interactions with the community (Pull Requests, etc.)
-   in the future.
+      <!-- Relay wall -->
+      <shape type="rectangle">
+         <ref id="white"/>
 
-3. An all-new cross-platform user interface is currently being developed using
-   the [NanoGUI](https://github.com/mitsuba-renderer/nanogui) library. *Note
-   that this is not yet complete.*
+         <transform name="to_world">
+               <rotate z="1" angle="180"/>
+               <scale x="$relay_wall_scale" y="$relay_wall_scale" z="1"/>
+         </transform>
 
-## Compiling and using Mitsuba 2
+         <!-- NLOS capture sensor placed on the relay wall -->
+         <sensor type="nloscapturemeter">
+               <sampler type="independent">
+                  <integer name="sample_count" value="$sample_count"/>
+               </sampler>
 
-Please see the [documentation](http://mitsuba2.readthedocs.org/en/latest) for
-details on how to compile, use, and extend Mitsuba 2.
+               <!-- Laser -->
+               <emitter type="projector">
+                  <spectrum name="irradiance" value="400:0, 500:80, 600:156.0, 700:184.0"/>
+                  <float name="fov" value="1.5"/>
+               </emitter>
 
-## About
+               <!-- Acount time of flight for the laser->relay wall and relay wall->sensor paths -->
+               <boolean name="account_first_and_last_bounces" value="$account_first_and_last_bounces"/>
 
-This project was created by [Wenzel Jakob](http://rgl.epfl.ch/people/wjakob).
-Significant features and/or improvements to the code were contributed by
-[Merlin Nimier-David](https://merlin.nimierdavid.fr/),
-[Guillaume Loubet](https://maverick.inria.fr/Membres/Guillaume.Loubet/),
-[Benoît Ruiz](https://github.com/4str0m),
-[Sébastien Speierer](https://github.com/Speierers),
-[Delio Vicini](https://dvicini.github.io/),
-and [Tizian Zeltner](https://tizianzeltner.com/).
+               <!-- World-space coordinates -->
+               <point name="sensor_origin" x="-0.5" y="0" z="0.25"/>
+               <point name="laser_origin" x="-0.5" y="0" z="0.25"/>
+               
+               <!-- alternative to laser_lookat_pixel -->
+               <!-- <point name="laser_lookat_3d" x="0" y="0" z="0"/> -->
+               
+               <!-- Screen-space coordinates (see streakhdrfilm) -->
+               <point name="laser_lookat_pixel" x="$laser_lookat_x" y="$laser_lookat_y" z="0"/>
+
+               <!-- Transient image I(width, height, num_bins) -->
+               <film type="streakhdrfilm" name="streakfilm">
+                  <integer name="width" value="$sensor_width"/>
+                  <integer name="height" value="$sensor_height"/>
+
+                  <!-- Recommended to prevent clamping -->
+                  <string name="component_format" value="float32"/>
+
+                  <integer name="num_bins" value="$num_bins"/>
+
+                  <!-- Auto-detect start_opl (and also bin_width_opl if set to a negative value) -->
+                  <boolean name="auto_detect_bins" value="$auto_detect_bins"/>
+                  <float name="bin_width_opl" value="$bin_width_opl"/>
+                  <float name="start_opl" value="$start_opl"/>
+
+                  <rfilter name="rfilter" type="box"/>
+                  <!-- NOTE: tfilters are not implemented yet -->
+                  <!-- <rfilter name="tfilter" type="box"/>  -->
+                  <boolean name="high_quality_edges" value="false"/>
+               </film>
+         </sensor>
+      </shape>
+   </scene>
+   ```
+</details>
+
+<br>
+
+Refer to the [original Mitsuba 2 repository](https://github.com/mitsuba-renderer/mitsuba2)
+for additional documentation and instructions on how to compile, use, and extend Mitsuba 2.
+
+## License
+
+See the [original repository](https://github.com/mitsuba-renderer/mitsuba2).
+<!-- Additionally, if you are using this code in academic research, we would be grateful
+if you cited our paper: -->
