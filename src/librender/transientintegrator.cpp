@@ -117,9 +117,14 @@ MTS_VARIANT bool TransientSamplingIntegrator<Float, Spectrum>::render(Scene *sce
         // each pass/block is divided into multiple divs so progress bar updates
         // more smoothly
         size_t samples_per_div = 100000;
-        size_t n_divs          = (samples_per_pass - 1) / samples_per_div + 1;
-        Log(Info, "Using (%i - 1) / %i + 1 = %i divs", samples_per_pass,
-            samples_per_div, n_divs);
+        size_t n_divs          = 1;
+        if (samples_per_pass < samples_per_div * 3) {
+            Log(Info, "Using 1 div");
+        } else {
+            n_divs = (samples_per_pass - 1) / samples_per_div + 1;
+            Log(Info, "Using (%i - 1) / %i + 1 = %i divs", samples_per_pass,
+                samples_per_div, n_divs);
+        }
 
         tbb::parallel_for(
             tbb::blocked_range<size_t>(0, total_blocks, 1),
