@@ -127,6 +127,39 @@ public:
                                 const DirectionSample3f &ds,
                                 Mask active = true) const;
 
+    /**
+     * \brief For non-line of sight scenes, sample a point in the hidden
+     *        geometry's surface area. The "hidden geometry" is defined
+     *        as any object that does not contain an \ref nloscapturemeter
+     *        plugin (i.e. every object but the relay wall)
+     *
+     * \param ref
+     *   A reference point somewhere within the scene
+     * 
+     * \param sample_
+     *   A uniformly distributed 2D vector
+     * 
+     * \return
+     *   Position sampling record
+     */
+    PositionSample3f sample_hidden_geometry_position(const Interaction3f &ref,
+                                                     const Point2f &sample_,
+                                                     Mask active = true) const;
+
+    /**
+     * \brief Evaluate the probability density of the  \ref
+     *        sample_hidden_geometry_position() technique given an
+     *        filled-in \ref PositionSample record.
+     *
+     * \param ps
+     *   A position sampling record, which specifies the query location.
+     * 
+     * \return
+     *    The solid angle density expressed of the sample
+     */
+    Float pdf_hidden_geometry_position(const PositionSample3f &ps,
+                                       Mask active = true) const;
+
     //! @}
     // =============================================================
 
@@ -219,6 +252,15 @@ protected:
     std::vector<ref<Object>> m_children;
     ref<Integrator> m_integrator;
     ref<Emitter> m_environment;
+
+    // same as m_shapes, but excluding relay wall objects (i.e. objects
+    // that are attached to a sensor)
+    std::vector<ref<Shape>> m_hidden_geometries;
+    // cumulative PDF of m_hidden_geometries
+    // m_hidden_geometries_pdf[i] = P(area-weighted random index <= i)
+    // e.g. if two hidden geometry objects with areas A_1 = 1 and A_2 = 2
+    // then hidden_geometries_pdf = {0.33f, 1.0f}
+    std::vector<Float> m_hidden_geometries_cpdf;
 
     bool m_shapes_grad_enabled;
 };
