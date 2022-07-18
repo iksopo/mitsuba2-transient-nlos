@@ -337,14 +337,18 @@ public:
             has_aovs ? Bitmap::PixelFormat::MultiChannel : m_pixel_format,
             m_component_format,
             {m_storage->time(), m_storage->width()},
-            has_aovs ? (m_storage->channel_count() - 1) : 0
+            // NOTE(diego): old code had "channel_count() - 1" here,
+            // but it makes scalar_rgb_polarized not work.
+            has_aovs ? m_storage->channel_count() : 0
             );
 
+// NOTE (diego): this part makes scalar_rgb_polarized not work
         if (has_aovs) {
             for (size_t i = 0, j = 0; i < m_channels.size(); ++i, ++j) {
                 Struct::Field &source_field = source->struct_()->operator[](i),
                     &dest_field   = target->struct_()->operator[](j);
 
+#if 0
                 switch (i) {
                     case 0:
                         dest_field.name = "R";
@@ -382,6 +386,9 @@ public:
                         dest_field.name = m_channels[i];
                         break;
                 }
+#else
+                dest_field.name = m_channels[i];
+#endif
 
                 source_field.name = m_channels[i];
             }
