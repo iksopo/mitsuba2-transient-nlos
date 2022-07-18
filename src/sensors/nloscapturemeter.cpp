@@ -116,8 +116,8 @@ public:
         m_laser_origin              = props.point3f("laser_origin", 0.f);
         Point3f laser_lookat3_pixel = props.point3f("laser_lookat_pixel", -1.f);
         Point3f laser_lookat3_3d    = props.point3f("laser_lookat_3d", 0.f);
-        m_target_lookat_is_pixel    = all(laser_lookat3_pixel > 0.f);
-        if (m_target_lookat_is_pixel) {
+        m_laser_lookat_is_pixel     = all(laser_lookat3_pixel > 0.f);
+        if (m_laser_lookat_is_pixel) {
             auto [film_width, film_height] = film_size();
             if (laser_lookat3_pixel.x() < 0 ||
                 film_width < laser_lookat3_pixel.x())
@@ -127,9 +127,15 @@ public:
                 Log(Warn, "Laser lookat pixel (Y position) is out of bounds");
             if (abs(laser_lookat3_pixel.z()) > math::Epsilon<float>)
                 Log(Warn, "Laser lookat pixel (Z position) should be 0");
-            m_target_lookat = laser_lookat3_pixel;
+            m_laser_lookat = laser_lookat3_pixel;
         } else {
-            m_target_lookat = laser_lookat3_3d;
+            m_laser_lookat = laser_lookat3_3d;
+        }
+
+        m_is_confocal = props.bool_("confocal", false);
+        m_film_size   = m_film->size();
+        if (m_is_confocal) {
+            const_cast<ScalarVector2i &>(m_film->size()) = ScalarVector2i(1, 1);
         }
 
         auto pmgr = PluginManager::instance();
@@ -158,30 +164,29 @@ private:
     void set_shape(Shape *shape) override {
         Base::set_shape(shape);
 
-        Point3f laser_target; // 3d
-        if (m_target_lookat_is_pixel) {
-            Point2f laser_lookat_pixel(m_target_lookat.x(),
-                                       m_target_lookat.y());
+        if (m_laser_lookat_is_pixel) {
+            Point2f laser_lookat_pixel(m_laser_lookat.x(),
+                                       m_laser_lookat.y());
             Point2f target_lookat_sample = pixel_to_sample(laser_lookat_pixel);
-            laser_target =
+            m_laser_target =
                 m_shape->sample_position(0.f, target_lookat_sample).p;
             Log(Info,
                 "Laser is pointed to pixel (%d, %d), which equals to 3D point "
                 "(%d, %d, %d)",
-                m_target_lookat.x(), m_target_lookat.y(), //
-                laser_target.x(), laser_target.y(), laser_target.z());
+                m_laser_lookat.x(), m_laser_lookat.y(), //
+                m_laser_target.x(), m_laser_target.y(), m_laser_target.z());
         } else {
-            laser_target = m_target_lookat;
+            m_laser_target = m_laser_lookat;
             Log(Info, "Laser is pointed to 3D point (%d, %d, %d)",
-                laser_target.x(), laser_target.y(), laser_target.z());
+                m_laser_target.x(), m_laser_target.y(), m_laser_target.z());
         }
         // NOTE(diego): const_cast bad, don't care
         const_cast<AnimatedTransform *>(m_emitter->world_transform())
-            ->append(0.f, Transform4f::look_at(m_laser_origin, laser_target,
+            ->append(0.f, Transform4f::look_at(m_laser_origin, m_laser_target,
                                                Vector3f(0.f, 1.f, 0.f)));
 
         m_laser_bounce_opl =
-            norm(laser_target - m_laser_origin) * lookup_ior("air");
+            norm(m_laser_target - m_laser_origin) * lookup_ior("air");
     }
 
     void traverse(TraversalCallback *callback) override {
@@ -191,8 +196,7 @@ private:
 
 private:
     std::pair<uint, uint> film_size() const {
-        ScalarPoint2i size = m_film->size();
-        return std::make_pair(size.x(), size.y());
+        return std::make_pair(m_film_size.x(), m_film_size.y());
     }
 
     Point3f sensor_origin(Float time, Mask active) const {
@@ -209,13 +213,18 @@ private:
     sample_direction(Float time, const Point2f &sample, Mask active) const {
         Point3f origin = sensor_origin(time, active);
 
-        auto [film_width, film_height] = film_size();
-        // instead of continuous samples over the whole shape,
-        // discretize samples so they only land on the center of the film's
-        // "pixels"
-        Point2f grid_sample = pixel_to_sample(Point2f{
-            floor(sample.x() * film_width), floor(sample.y() * film_height) });
-        Point3f target = m_shape->sample_position(time, grid_sample, active).p;
+        Point3f target;
+        if (m_is_confocal) {
+            target = m_laser_target;
+        } else {
+            auto [film_width, film_height] = film_size();
+            // instead of continuous samples over the whole shape,
+            // discretize samples so they only land on the center of the film's
+            // "pixels"
+            Point2f grid_sample = pixel_to_sample(Point2f{
+                floor(sample.x() * film_width), floor(sample.y() * film_height) });
+            target = m_shape->sample_position(time, grid_sample, active).p;
+        }
 
         Vector3f direction = target - origin;
         Float distance     = norm(direction);
@@ -276,10 +285,15 @@ public:
 private:
     ref<Emitter> m_emitter;
     Point3f m_laser_origin;
-    Point3f m_target_lookat;
-    // true: m_target_lookat is (x, y, 0) pixel in m_sensor
-    // false: m_target_lookat is (x, y, z) world coordinates
-    bool m_target_lookat_is_pixel;
+    bool m_is_confocal;
+    // can be different from original film size if e.g. confocal
+    ScalarPoint2i m_film_size;
+    // true: m_laser_lookat is (x, y, 0) pixel in m_sensor
+    // false: m_laser_lookat is (x, y, z) world coordinates
+    bool m_laser_lookat_is_pixel;
+    // m_laser_lookat depends on m_laser_lookat_is_pixel,
+    // m_laser_target is always a 3d point
+    Point3f m_laser_lookat, m_laser_target;
     bool m_account_first_and_last_bounces;
     Float m_laser_bounce_opl;
 };
