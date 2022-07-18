@@ -19,7 +19,8 @@ public:
     TransientPathIntegrator(const Properties &props) : Base(props) {
         m_filter_depth = props.int_("filter_depth", -1);
         // avoid the case filter_depth >= max_depth
-        Assert(m_filter_depth < m_max_depth);
+        Assert(m_filter_depth == -1 || m_max_depth == 1 ||
+               m_filter_depth < m_max_depth);
         m_discard_direct_paths = props.bool_("discard_direct_paths", false);
         // avoid the case m_discard_direct_paths && m_filter_depth > 0
         Assert(!m_discard_direct_paths || m_filter_depth <= 0);
