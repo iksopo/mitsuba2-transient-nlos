@@ -81,6 +81,7 @@ MTS_VARIANT bool TransientSamplingIntegrator<Float, Spectrum>::render(Scene *sce
         film->auto_detect_bins(scene, sensor);
     film->prepare(channels);
 
+    prepare_integrator(scene);
     m_render_timer.reset();
     if constexpr (!is_cuda_array_v<Float>) {
         /// Render on the CPU using a spiral pattern
