@@ -30,6 +30,9 @@ public:
         m_nlos_hidden_geometry_sampling_do_mis =
             props.bool_("nlos_hidden_geometry_sampling_do_mis", false) &&
             m_nlos_hidden_geometry_sampling;
+        m_nlos_hidden_geometry_sampling_includes_relay_wall =
+            props.bool_("nlos_hidden_geometry_sampling_includes_relay_wall", true) &&
+            m_nlos_hidden_geometry_sampling;
     }
 
     void emitter_nee_sample(
@@ -85,11 +88,9 @@ public:
         Vector3f d = m_nlos_laser_target - si.p;
         Float dist = norm(d);
         d /= dist;
-        Ray3f ray_bsdf(si.p, d,
-                        math::RayEpsilon<Float> *
-                            (1.f + hmax(abs(si.p))),
-                        dist * (1.f - math::ShadowEpsilon<Float>),
-                        si.time, si.wavelengths);
+        Ray3f ray_bsdf(
+            si.p, d, math::RayEpsilon<Float> * (1.f + hmax(abs(si.p))),
+            dist * (1.f - math::ShadowEpsilon<Float>), si.time, si.wavelengths);
         // active rays are those that did NOT intersect
         active_e &= !scene->ray_test(ray_bsdf, active_e);
 
@@ -97,14 +98,14 @@ public:
         if (any_or<true>(active_e)) {
             Vector3f wo       = si.to_local(d);
             Spectrum bsdf_val = bsdf->eval(ctx, si, wo, active_e);
-            bsdf_val = si.to_world_mueller(bsdf_val, -wo, si.wi);
+            bsdf_val          = si.to_world_mueller(bsdf_val, -wo, si.wi);
 
             ray_bsdf.maxt = math::Infinity<Float>;
             SurfaceInteraction3f si_bsdf =
                 scene->ray_intersect(ray_bsdf, active_e);
             active_e &= si_bsdf.is_valid();
             active_e &= any_inner(depolarize<Spectrum>(bsdf_val) >
-                                    math::Epsilon<Float>);
+                                  math::Epsilon<Float>);
             Vector3f wl = si_bsdf.to_local(-d);
             active_e &= Frame3f::cos_theta(wl) > 0.f;
 
@@ -124,22 +125,22 @@ public:
                 BSDFPtr bsdf_next = si_bsdf.bsdf(ray_bsdf);
 
                 // 3. Combine nlos + emitter sampling
-                emitter_nee_sample(scene, sampler, ctx, si_bsdf,
-                                active_e, timed_samples_record,
-                                bsdf_next, throughput * bsdf_val,
-                                path_opl + dist * current_ior,
-                                current_ior, depth + 1);
+                emitter_nee_sample(
+                    scene, sampler, ctx, si_bsdf, active_e,
+                    timed_samples_record, bsdf_next, throughput * bsdf_val,
+                    path_opl + dist * current_ior, current_ior, depth + 1);
             }
         }
     }
 
     std::pair<BSDFSample3f, Spectrum>
-    hidden_geometry_sample(const Scene* scene, const BSDFPtr& bsdf, const BSDFContext &ctx,
+    hidden_geometry_sample(const Scene *scene, const BSDFPtr &bsdf,
+                           const BSDFContext &ctx,
                            const SurfaceInteraction3f &si, Float /* sample1 */,
                            const Point2f &sample2, Mask active) const {
 
-        PositionSample3f ps_hg = scene->sample_hidden_geometry_position(
-            si, sample2, active);
+        PositionSample3f ps_hg =
+            scene->sample_hidden_geometry_position(si, sample2, active);
         active &= neq(ps_hg.pdf, 0.f);
 
         Vector3f d = ps_hg.p - si.p;
@@ -148,19 +149,18 @@ public:
         RayDifferential3f ray_hg(
             si.p, d, math::RayEpsilon<Float> * (1.f + hmax(abs(si.p))),
             math::Infinity<Float>, si.time, si.wavelengths);
-        SurfaceInteraction3f si_hg =
-            scene->ray_intersect(ray_hg, active);
+        SurfaceInteraction3f si_hg = scene->ray_intersect(ray_hg, active);
         active &= si_hg.is_valid();
 
         SurfaceInteraction3f si_test;
-        Point3f p_test = si_hg.p;
-        Mask active_test = active;
+        Point3f p_test         = si_hg.p;
+        Mask active_test       = active;
         uint num_intersections = 0;
         while (num_intersections == 0 || active_test) {
             num_intersections++;
             Ray3f ray_test(p_test, d, si.time);
             ray_test.mint = math::RayEpsilon<Float> * (1.f + hmax(abs(si.p)));
-            si_test = scene->ray_intersect(ray_test, active);
+            si_test       = scene->ray_intersect(ray_test, active);
             active_test &= si_test.is_valid();
             if (unlikely(num_intersections > 100)) {
                 // Some rays get stuck in an infinite loop, creating a cycle
@@ -175,19 +175,19 @@ public:
         Spectrum bsdf_val = bsdf->eval(ctx, si, wo, active);
         bsdf_val          = si.to_world_mueller(bsdf_val, -wo, si.wi);
 
-        active &= any_inner(depolarize<Spectrum>(bsdf_val) >
-                                math::Epsilon<Float>);
+        active &=
+            any_inner(depolarize<Spectrum>(bsdf_val) > math::Epsilon<Float>);
         Vector3f wg = si_hg.to_local(-d);
         bsdf_val *= sqr(rcp(dist)) * Frame3f::cos_theta(wg);
 
-        BSDFSample3f bs = zero<BSDFSample3f>();
-        bs.wo = wg;
-        bs.pdf = ps_hg.pdf * num_intersections;
-        bs.eta = 1.f;
-        bs.sampled_type = +BSDFFlags::DeltaReflection;
+        BSDFSample3f bs      = zero<BSDFSample3f>();
+        bs.wo                = wg;
+        bs.pdf               = ps_hg.pdf * num_intersections;
+        bs.eta               = 1.f;
+        bs.sampled_type      = +BSDFFlags::DeltaReflection;
         bs.sampled_component = 0;
 
-        return { bs, select(active && bs.pdf > 0.f, bsdf_val, 0.f) };
+        return { bs, select(active && bs.pdf > math::Epsilon<Float>, bsdf_val, 0.f) };
     }
 
     void
@@ -377,6 +377,10 @@ protected:
         }
     }
 
+    bool hidden_geometry_sampling_includes_relay_wall() const override {
+        return m_nlos_hidden_geometry_sampling_includes_relay_wall;
+    }
+
     Float mis_weight(Float pdf_a, Float pdf_b) const {
         pdf_a *= pdf_a;
         pdf_b *= pdf_b;
@@ -389,7 +393,8 @@ private:
     bool m_discard_direct_paths;
     bool m_nlos_laser_sampling,
         m_nlos_hidden_geometry_sampling,
-        m_nlos_hidden_geometry_sampling_do_mis;
+        m_nlos_hidden_geometry_sampling_do_mis,
+        m_nlos_hidden_geometry_sampling_includes_relay_wall;
     Point3f m_nlos_laser_target;
 };
 

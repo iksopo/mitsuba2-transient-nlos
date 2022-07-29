@@ -5,6 +5,7 @@
 #include <mitsuba/render/scene.h>
 #include <mitsuba/render/kdtree.h>
 #include <mitsuba/render/integrator.h>
+#include <mitsuba/render/transientintegrator.h>
 #include <enoki/stl.h>
 
 #if defined(MTS_ENABLE_EMBREE)
@@ -105,23 +106,31 @@ MTS_VARIANT Scene<Float, Spectrum>::Scene(const Properties &props) {
         sensor->set_scene(this);
 
     // NOTE(diego): prepare data for hidden geometry sampling
+    bool include_relay_wall = true;
+    TransientSamplingIntegrator<Float, Spectrum> *tsi =
+        dynamic_cast<TransientSamplingIntegrator<Float, Spectrum> *>(
+            m_integrator.get());
+    if (tsi) {
+        include_relay_wall =
+            tsi->hidden_geometry_sampling_includes_relay_wall();
+    }
     Float total_pdf = 0.f;
-    for (const auto& shape: m_shapes) {
+    for (const auto &shape : m_shapes) {
         bool is_relay_wall = false;
-        for (const auto& sensor: m_sensors) {
+        for (const auto &sensor : m_sensors) {
             if (sensor->shape() == shape) {
                 is_relay_wall = true;
                 break;
             }
         }
-        if (is_relay_wall) {
+        if (!include_relay_wall && is_relay_wall) {
             continue;
         }
         m_hidden_geometries.push_back(shape);
         m_hidden_geometries_cpdf.push_back(total_pdf + shape->surface_area());
         total_pdf += shape->surface_area();
     }
-    for (Float& pdf: m_hidden_geometries_cpdf) {
+    for (Float &pdf : m_hidden_geometries_cpdf) {
         pdf /= total_pdf;
     }
 
