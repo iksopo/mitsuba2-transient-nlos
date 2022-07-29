@@ -7,9 +7,12 @@
 **Authors:** [Diego Royo](https://diego.contact), 
 [Jorge Garcia](https://github.com/jgarciapueyo), [Adolfo Muñoz](http://www.adolfo-munoz.com/), [Adrián Jarabo](http://giga.cps.unizar.es/~ajarabo/) and [the original Mitsuba 2 authors](https://github.com/mitsuba-renderer/mitsuba2).
 
-Mitsuba 2, extended for transient path tracing and non-line of sight data capture.
+Mitsuba 2, extended for transient path tracing and non-line-of-sight data capture.
 
 ## Documentation and usage
+
+**See 
+[tal python library](https://github.com/diegoroyo/tal), with utilies to execute mitsuba and visualize its results.**
 
 ### Transient path tracing
 
@@ -55,7 +58,7 @@ We provide the `transientpath`, `transientstokes` and `streakhdrfilm` plugins. T
 </scene>
 ```
 
-### Non-line of sight data capture
+### Non-line-of-sight data capture
 
 We provide the `nloscapturemeter` plugin. See [nloscapturemeter](https://github.com/diegoroyo/mitsuba2/blob/feat-transient/src/sensors/nloscapturemeter.cpp) for additional details. There is an example scene below.
 
@@ -72,7 +75,10 @@ _Note that variables that start with $ should be changed_
       <!-- <integer name="filter_depth" value="3"/> -->
       <boolean name="discard_direct_paths" value="true"/>
       <!-- Next event estimation for the laser through the relay wall (recommended true) -->
-      <boolean name="nlos_emitter_sampling" value="true"/>
+      <boolean name="nlos_laser_sampling" value="true"/>
+      <boolean name="nlos_hidden_geometry_sampling" value="false"/>
+      <boolean name="nlos_hidden_geometry_sampling_do_mis" value="false"/>
+      <boolean name="nlos_hidden_geometry_sampling_includes_relay_wall" value="false"/>
    </integrator>
 
    <!-- Relay wall and hidden geometry materials -->
@@ -162,4 +168,15 @@ for additional documentation and instructions on how to compile, use, and extend
 
 ## License and citation
 
-See the [original repository](https://github.com/mitsuba-renderer/mitsuba2). Additionally, if you are using this code in academic research, we would be grateful if you cited our publication (available soon).
+See the [original repository](https://github.com/mitsuba-renderer/mitsuba2). Additionally, if you are using this code in academic research, we would be grateful if you cited [our publication](https://doi.org/10.1016/j.cag.2022.07.003):
+
+```bibtex
+@article{royo2022non,
+    title = {Non-line-of-sight transient rendering},
+    journal = {Computers & Graphics},
+    year = {2022},
+    issn = {0097-8493},
+    doi = {https://doi.org/10.1016/j.cag.2022.07.003},
+    url = {https://www.sciencedirect.com/science/article/pii/S0097849322001200},
+    author = {Diego Royo and Jorge García and Adolfo Muñoz and Adrian Jarabo}
+```
