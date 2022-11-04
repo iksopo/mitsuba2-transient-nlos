@@ -314,8 +314,12 @@ public:
 
         DynamicBuffer<Float> dslice = m_storage->data(slice);
 
+        bool has_aovs = m_channels.size() != 3 && m_channels.size() != 5;
+
         ref<Bitmap> source = new Bitmap(
-            m_channels.size() != 4 ? Bitmap::PixelFormat::MultiChannel : Bitmap::PixelFormat::XYZA,
+            has_aovs ? Bitmap::PixelFormat::MultiChannel
+                     : (m_channels.size() == 3 ? Bitmap::PixelFormat::XYZ
+                                               : Bitmap::PixelFormat::XYZAW),
             struct_type_v<ScalarFloat>,
             {m_storage->time(), m_storage->width()},
             m_storage->channel_count(),
@@ -330,8 +334,6 @@ public:
 
         if (raw)
             return source;
-
-        bool has_aovs = m_channels.size() != 4;
 
         ref<Bitmap> target = new Bitmap(
             has_aovs ? Bitmap::PixelFormat::MultiChannel : m_pixel_format,

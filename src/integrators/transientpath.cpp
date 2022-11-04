@@ -114,7 +114,7 @@ public:
             // the solid angle projection of si.p to
             // nlos_laser_target.
             // This is like a point light, but the extra cos term
-            // as it is not a point light that emits in all
+            // exists as it is not a point light that emits in all
             // directions :^)
             // The incident cos term at
             // nlos_laser_target will be taken into account by
@@ -175,13 +175,17 @@ public:
         Spectrum bsdf_val = bsdf->eval(ctx, si, wo, active);
         bsdf_val          = si.to_world_mueller(bsdf_val, -wo, si.wi);
 
-        active &=
-            any_inner(depolarize<Spectrum>(bsdf_val) > math::Epsilon<Float>);
         Vector3f wg = si_hg.to_local(-d);
-        bsdf_val *= sqr(rcp(dist)) * Frame3f::cos_theta(wg);
-
+        Float travel_dist = norm(si_hg.p - si.p);
+        bsdf_val *= sqr(rcp(travel_dist)) * Frame3f::cos_theta(wg);
+        // discard low travel dist, produces high variance
+        // the integrator will use bsdf sampling instead
+        active &= travel_dist > 1.f;  
+        active &=
+            !any_inner(depolarize<Spectrum>(bsdf_val) < math::Epsilon<Float>);
+            
         BSDFSample3f bs      = zero<BSDFSample3f>();
-        bs.wo                = wg;
+        bs.wo                = wo;
         bs.pdf               = ps_hg.pdf * num_intersections;
         bs.eta               = 1.f;
         bs.sampled_type      = +BSDFFlags::DeltaReflection;
@@ -291,7 +295,6 @@ public:
                     do_bsdf_sampling = false;
                     pdf_bsdf_method  = 1.f;
                 }
-
             } else {
                 do_bsdf_sampling = true;
                 pdf_bsdf_method  = 1.f;
@@ -299,15 +302,17 @@ public:
 
             BSDFSample3f bs;
             Spectrum bsdf_val;
-            if (do_bsdf_sampling) {
+            if (!do_bsdf_sampling) {
+                std::tie(bs, bsdf_val) = hidden_geometry_sample(
+                    scene, bsdf, ctx, si, sampler->next_1d(active),
+                    sampler->next_2d(active), active);
+            }
+            if (do_bsdf_sampling || any_inner(depolarize<Spectrum>(bsdf_val) <
+                                              math::Epsilon<Float>)) {
                 std::tie(bs, bsdf_val) =
                     bsdf->sample(ctx, si, sampler->next_1d(active),
                                  sampler->next_2d(active), active);
                 bsdf_val = si.to_world_mueller(bsdf_val, -bs.wo, si.wi);
-            } else {
-                std::tie(bs, bsdf_val) = hidden_geometry_sample(
-                    scene, bsdf, ctx, si, sampler->next_1d(active),
-                    sampler->next_2d(active), active);
             }
 
             throughput = throughput * bsdf_val / pdf_bsdf_method;

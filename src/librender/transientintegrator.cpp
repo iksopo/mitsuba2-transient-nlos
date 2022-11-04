@@ -75,8 +75,9 @@ MTS_VARIANT bool TransientSamplingIntegrator<Float, Spectrum>::render(Scene *sce
     bool has_aovs = !channels.empty();
 
     // Insert default channels and set up the film
-    for (size_t i = 0; i < 4; ++i)
-        channels.insert(channels.begin() + i, std::string(1, "XYZA"[i]));
+    uint channels_to_push = sensor->is_nlos_sensor() ? 3 : 5;
+    for (size_t i = 0; i < channels_to_push; ++i)
+        channels.insert(channels.begin() + i, std::string(1, "XYZAW"[i]));
     if (film->should_auto_detect_bins())
         film->auto_detect_bins(scene, sensor);
     film->prepare(channels);
@@ -344,8 +345,12 @@ TransientSamplingIntegrator<Float, Spectrum>::render_sample(const Scene *scene,
             xyz = spectrum_to_xyz(spec_u, ray.wavelengths, mask);
         }
 
-        // XYZA pushed backwards
-        aovs_record[i].push_front(select(mask, Float(1.f), Float(0.f)));
+        if (!sensor->is_nlos_sensor()) {
+            // AW pushed backwards
+            aovs_record[i].push_front(1.f);
+            aovs_record[i].push_front(select(mask, Float(1.f), Float(0.f)));
+        }
+        // XYZ pushed backwards
         aovs_record[i].push_front(xyz.z());
         aovs_record[i].push_front(xyz.y());
         aovs_record[i].push_front(xyz.x());

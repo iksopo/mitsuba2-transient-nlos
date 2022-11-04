@@ -194,6 +194,8 @@ private:
         // NOTE(diego): not implemented
     }
 
+    bool is_nlos_sensor() const override { return true; }
+
 private:
     std::pair<uint, uint> film_size() const {
         return std::make_pair(m_film_size.x(), m_film_size.y());
