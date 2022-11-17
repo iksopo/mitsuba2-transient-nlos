@@ -120,6 +120,8 @@ public:
         m_resolution = ScalarVector2f(m_film->crop_size());
     }
 
+    virtual bool is_nlos_sensor() const { return false; }
+
     MTS_DECLARE_CLASS()
 protected:
     Sensor(const Properties &props);
