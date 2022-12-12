@@ -116,7 +116,7 @@ public:
         m_laser_origin              = props.point3f("laser_origin", 0.f);
         Point3f laser_lookat3_pixel = props.point3f("laser_lookat_pixel", -1.f);
         Point3f laser_lookat3_3d    = props.point3f("laser_lookat_3d", 0.f);
-        m_laser_lookat_is_pixel     = all(laser_lookat3_pixel > 0.f);
+        m_laser_lookat_is_pixel     = laser_lookat3_pixel.x() > 0.f && laser_lookat3_pixel.y() > 0.f;
         if (m_laser_lookat_is_pixel) {
             auto [film_width, film_height] = film_size();
             if (laser_lookat3_pixel.x() < 0 ||
@@ -136,6 +136,7 @@ public:
         m_film_size   = m_film->size();
         if (m_is_confocal) {
             const_cast<ScalarVector2i &>(m_film->size()) = ScalarVector2i(1, 1);
+            const_cast<ScalarVector2i &>(m_film->crop_size()) = ScalarVector2i(1, 1);
         }
 
         auto pmgr = PluginManager::instance();
@@ -207,8 +208,8 @@ private:
 
     Point2f pixel_to_sample(const Point2f &pixel) const {
         auto [film_width, film_height] = film_size();
-        return Point2f{ (pixel.x() + 0.5f) / film_width,
-                        (pixel.y() + 0.5f) / film_height };
+        return Point2f{ pixel.x() / film_width,
+                        pixel.y() / film_height };
     }
 
     std::pair<Float, Vector3f>
