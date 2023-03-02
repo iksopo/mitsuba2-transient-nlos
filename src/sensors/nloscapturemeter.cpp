@@ -113,6 +113,13 @@ public:
             ->append(0.f, Transform4f::translate(
                               props.point3f("sensor_origin", 0.f)));
 
+        m_is_confocal = props.bool_("confocal", false);
+        m_film_size   = m_film->size();
+        if (m_is_confocal) {
+            const_cast<ScalarVector2i &>(m_film->size()) = ScalarVector2i(1, 1);
+            const_cast<ScalarVector2i &>(m_film->crop_size()) = ScalarVector2i(1, 1);
+        }
+
         m_laser_origin              = props.point3f("laser_origin", 0.f);
         Point3f laser_lookat3_pixel = props.point3f("laser_lookat_pixel", -1.f);
         Point3f laser_lookat3_3d    = props.point3f("laser_lookat_3d", 0.f);
@@ -130,13 +137,6 @@ public:
             m_laser_lookat = laser_lookat3_pixel;
         } else {
             m_laser_lookat = laser_lookat3_3d;
-        }
-
-        m_is_confocal = props.bool_("confocal", false);
-        m_film_size   = m_film->size();
-        if (m_is_confocal) {
-            const_cast<ScalarVector2i &>(m_film->size()) = ScalarVector2i(1, 1);
-            const_cast<ScalarVector2i &>(m_film->crop_size()) = ScalarVector2i(1, 1);
         }
 
         auto pmgr = PluginManager::instance();
