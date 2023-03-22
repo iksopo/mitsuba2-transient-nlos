@@ -19,20 +19,28 @@ public:
     TransientPathIntegrator(const Properties &props) : Base(props) {
         m_filter_depth = props.int_("filter_depth", -1);
         // avoid the case filter_depth >= max_depth
-        Assert(m_filter_depth == -1 || m_max_depth == 1 ||
+        Assert(m_filter_depth == -1 || m_max_depth == -1 ||
                m_filter_depth < m_max_depth);
         m_discard_direct_paths = props.bool_("discard_direct_paths", false);
-        // avoid the case m_discard_direct_paths && m_filter_depth > 0
-        Assert(!m_discard_direct_paths || m_filter_depth <= 0);
+        // avoid the case m_discard_direct_paths && m_filter_depth == 1
+        Assert(!m_discard_direct_paths || m_filter_depth != 1);
         m_nlos_laser_sampling = props.bool_("nlos_laser_sampling", false);
         m_nlos_hidden_geometry_sampling =
             props.bool_("nlos_hidden_geometry_sampling", false);
-        m_nlos_hidden_geometry_sampling_do_mis =
-            props.bool_("nlos_hidden_geometry_sampling_do_mis", false) &&
+        m_nlos_hidden_geometry_sampling_do_rroulette =
+            props.bool_("nlos_hidden_geometry_sampling_do_rroulette", false) &&
             m_nlos_hidden_geometry_sampling;
         m_nlos_hidden_geometry_sampling_includes_relay_wall =
             props.bool_("nlos_hidden_geometry_sampling_includes_relay_wall", true) &&
             m_nlos_hidden_geometry_sampling;
+    }
+
+    bool should_store_sample(const int depth) const {
+        if (m_discard_direct_paths && depth == 1)
+            return false;
+        if (m_filter_depth != -1)
+            return depth == m_filter_depth;
+        return true;
     }
 
     void emitter_nee_sample(
@@ -62,7 +70,7 @@ public:
         Spectrum radiance(0.f);
         radiance[active_e] += mis * throughput * bsdf_val * emitter_val;
 
-        if (depth == m_filter_depth || (!m_discard_direct_paths || depth >= 2))
+        if (should_store_sample(depth))
             timed_samples_record.emplace_back(path_opl + ds.dist * current_ior,
                                               radiance, active_e);
     }
@@ -156,16 +164,16 @@ public:
         Point3f p_test         = si_hg.p;
         Mask active_test       = active;
         uint num_intersections = 0;
-        while (num_intersections == 0 || active_test) {
+        while (num_intersections == 0 || any(active_test)) {
             num_intersections++;
             Ray3f ray_test(p_test, d, si.time);
             ray_test.mint = math::RayEpsilon<Float> * (1.f + hmax(abs(si.p)));
-            si_test       = scene->ray_intersect(ray_test, active);
+            si_test       = scene->ray_intersect(ray_test, active_test);
             active_test &= si_test.is_valid();
             if (unlikely(num_intersections > 100)) {
                 // Some rays get stuck in an infinite loop, creating a cycle
                 // of p_test points. Just ignore those cases.
-                active = false;
+                active_test = false;
                 break;
             }
             p_test = si_test.p;
@@ -242,8 +250,7 @@ public:
                 radiance[active] +=
                     emission_weight * throughput * emitter->eval(si, active);
                 Mask path_finished = active;
-                if (depth == m_filter_depth ||
-                    (!m_discard_direct_paths || depth >= 2))
+                if (should_store_sample(depth))
                     timed_samples_record.emplace_back(path_opl, radiance,
                                                       path_finished);
             }
@@ -284,7 +291,7 @@ public:
             bool do_bsdf_sampling;
             Float pdf_bsdf_method;
             if (m_nlos_hidden_geometry_sampling) {
-                if (m_nlos_hidden_geometry_sampling_do_mis) {
+                if (m_nlos_hidden_geometry_sampling_do_rroulette) {
                     Float BSDF_SAMPLING_Q = 0.5f;
                     do_bsdf_sampling =
                         sampler->next_1d(active) < BSDF_SAMPLING_Q;
@@ -307,7 +314,7 @@ public:
                     scene, bsdf, ctx, si, sampler->next_1d(active),
                     sampler->next_2d(active), active);
             }
-            if (do_bsdf_sampling || any_inner(depolarize<Spectrum>(bsdf_val) <
+            if (do_bsdf_sampling || all_inner(depolarize<Spectrum>(bsdf_val) <
                                               math::Epsilon<Float>)) {
                 std::tie(bs, bsdf_val) =
                     bsdf->sample(ctx, si, sampler->next_1d(active),
@@ -357,12 +364,12 @@ public:
                            "  discard_direct_paths = %s,\n"
                            "  nlos_laser_sampling = %s,\n"
                            "  nlos_hidden_goemetry_sampling = %s,\n"
-                           "  nlos_hidden_goemetry_sampling_do_mis = %s\n"
+                           "  nlos_hidden_goemetry_sampling_do_rroulette = %s\n"
                            "]",
                            m_max_depth, m_rr_depth, m_filter_depth,
                            m_discard_direct_paths, m_nlos_laser_sampling,
                            m_nlos_hidden_geometry_sampling,
-                           m_nlos_hidden_geometry_sampling_do_mis);
+                           m_nlos_hidden_geometry_sampling_do_rroulette);
     }
 
 protected:
@@ -398,7 +405,7 @@ private:
     bool m_discard_direct_paths;
     bool m_nlos_laser_sampling,
         m_nlos_hidden_geometry_sampling,
-        m_nlos_hidden_geometry_sampling_do_mis,
+        m_nlos_hidden_geometry_sampling_do_rroulette,
         m_nlos_hidden_geometry_sampling_includes_relay_wall;
     Point3f m_nlos_laser_target;
 };

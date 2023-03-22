@@ -224,8 +224,9 @@ private:
             // instead of continuous samples over the whole shape,
             // discretize samples so they only land on the center of the film's
             // "pixels"
-            Point2f grid_sample = pixel_to_sample(Point2f{
-                floor(sample.x() * film_width), floor(sample.y() * film_height) });
+            Point2f grid_sample = pixel_to_sample(
+                Point2f{ floor(sample.x() * film_width) + 0.5f,
+                         floor(sample.y() * film_height) + 0.5f });
             target = m_shape->sample_position(time, grid_sample, active).p;
         }
 
