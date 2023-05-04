@@ -417,7 +417,6 @@ public:
 
         // Remove extension if it exists
         fs::create_directory(directoryname.replace_extension());
-
         for(int i = 0; i < m_size.y(); ++i) {
             std::string filename_str = "frame_" + std::to_string(i);
             fs::path filename = fs::path(filename_str);

@@ -170,10 +170,11 @@ protected:
     // NOTE(diego): Integrator-specific precalculations that should be done
     // before rendering a sample
     // e.g. transientpath calculates the target laser point
-    virtual void prepare_integrator(const Scene* /* scene */) {}
 
 public:
     virtual bool hidden_geometry_sampling_includes_relay_wall() const { return true; }
+    
+    virtual void prepare_integrator(const Scene* /* scene */) {}
 
 protected:
     /// Integrators should stop all work when this flag is set to true.

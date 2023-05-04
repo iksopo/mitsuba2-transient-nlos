@@ -372,7 +372,6 @@ public:
                            m_nlos_hidden_geometry_sampling_do_rroulette);
     }
 
-protected:
     void prepare_integrator(const Scene* scene) override {
         if (m_nlos_laser_sampling) {
             auto emitters = scene->emitters();
@@ -389,6 +388,7 @@ protected:
         }
     }
 
+public:
     bool hidden_geometry_sampling_includes_relay_wall() const override {
         return m_nlos_hidden_geometry_sampling_includes_relay_wall;
     }

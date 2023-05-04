@@ -35,7 +35,6 @@ public:
 
         m_integrator->sample(scene, sampler, ray, medium, aovs_record,
                              timed_samples_record, max_path_opl, active);
-
         // Either there are no aovs samples because the m_integrator does not produce
         // aovs and the aov vector is empty or the integrator produces aovs and
         // there are as many aov samples as radiance samples (one aov sample for
@@ -102,6 +101,11 @@ public:
                 }
             }
         }
+    }
+
+
+    void prepare_integrator(const Scene* scene) override {
+        m_integrator->prepare_integrator(scene);
     }
 
     std::vector<std::string> aov_names() const override {
