@@ -103,6 +103,7 @@ public:
         m_sample_to_camera = m_camera_to_sample.inverse();
 
         m_flags = +EmitterFlags::DeltaPosition;
+        std::cout << "theta = " << string::indent(m_theta) << std::endl;
     }
 
     Float pdf_direction(const Interaction3f &, const DirectionSample3f &,
@@ -149,6 +150,7 @@ public:
         ray.update();
 
         Spectrum ret = unpolarized<Spectrum>(weight / pdf);
+        std::cout << "Polarizedray?  " << is_polarized_v<Spectrum> << std::endl;
 
         if constexpr (is_polarized_v<Spectrum>) {
             // Query rotation angle
@@ -157,7 +159,6 @@ public:
             Spectrum M = mueller::linear_polarizer(1.f);
             // Rotate optical element by specified angle
             M = mueller::rotated_element(theta, M);
-
             return std::make_pair(ray,  (M * ret) & active);
         } else {
             return std::make_pair(ray,  ret & active);
@@ -202,7 +203,20 @@ public:
         spec *= math::Pi<Float> * m_intensity->eval(it_query, active) *
                 sqr(rcp(it_local.z())) / -dot(ds.n, ds.d);
 
-        return { ds, unpolarized<Spectrum>(spec & active) };
+        //std::cout << "Polarizeddir?  " << is_polarized_v<Spectrum> << std::endl;
+        if constexpr (is_polarized_v<Spectrum>) {
+            // Query rotation angle
+            UnpolarizedSpectrum theta = deg_to_rad(m_theta->eval(it_query, active));
+            // Get standard Mueller matrix for a linear polarizer.
+            Spectrum M = mueller::linear_polarizer(1.f);
+            // Rotate optical element by specified angle
+            M = mueller::rotated_element(theta, M);
+            Spectrum polSpec = M * unpolarized<Spectrum>(spec);
+            return {ds, polSpec & active};
+        } else {
+            return { ds, unpolarized<Spectrum>(spec & active) };
+        }
+
     }
 
     ScalarBoundingBox3f bbox() const override {
