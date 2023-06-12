@@ -39,6 +39,18 @@ template <typename Float> MuellerMatrix<Float> depolarizer(Float value = 1.f) {
 }
 
 /**
+* \brief Constructs the Mueller matrix of an ideal preserver
+*/
+template <typename Float> MuellerMatrix<Float> preserver() {
+    return MuellerMatrix<Float>(
+        1, 0, 0, 0,
+        0, 1, 0, 0,
+        0, 0, 1, 0,
+        0, 0, 0, 1
+    );
+}
+
+/**
 * \brief Constructs the Mueller matrix of an ideal absorber
 *
 * \param value
