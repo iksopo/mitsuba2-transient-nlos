@@ -157,6 +157,7 @@ public:
 
         m_sample_to_camera = m_camera_to_sample.inverse();
 
+
         // Position differentials on the near plane
         m_dx = m_sample_to_camera * ScalarPoint3f(1.f / m_resolution.x(), 0.f, 0.f) -
                m_sample_to_camera * ScalarPoint3f(0.f);
@@ -239,14 +240,14 @@ public:
         ray.maxt = m_far_clip * inv_z;
 
         auto trafo = m_world_transform->eval(ray.time, active);
-        ray.o = trafo.translation() * near_p;
+        ray.o = trafo * near_p;
         ray.d = trafo * d;
         ray.update();
 
         ray.o_x = ray.o_y = ray.o;
 
-        ray.d_x = trafo * normalize(Vector3f(near_p) + m_dx);
-        ray.d_y = trafo * normalize(Vector3f(near_p) + m_dy);
+        ray.d_x = trafo * normalize(d + m_dx);
+        ray.d_y = trafo * normalize(d + m_dy);
         ray.has_differentials = true;
 
         return std::make_pair(ray, wav_weight);
@@ -334,7 +335,7 @@ public:
         using string::indent;
 
         std::ostringstream oss;
-        oss << "PerspectiveCamera[" << std::endl
+        oss << "OrtographicCamera[" << std::endl
             << "  near_clip = " << m_near_clip << "," << std::endl
             << "  far_clip = " << m_far_clip << "," << std::endl
             << "  film = " << indent(m_film) << "," << std::endl
