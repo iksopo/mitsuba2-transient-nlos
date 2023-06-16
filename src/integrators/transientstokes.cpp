@@ -42,6 +42,12 @@ public:
         assert(aovs_record.empty() ||
                (aovs_record.size() == timed_samples_record.size()));
 
+        auto sensor = scene->sensors()[0];
+        const AnimatedTransform *transform = sensor->world_transform();
+        Vector3f current_basis = mueller::stokes_basis(-ray.d);
+        Vector3f vertical = transform->eval(ray.time) * Vector3f(0.f, 1.f, 0.f);
+        Vector3f target_basis = cross(ray.d, vertical);
+        
         if(aovs_record.empty()) {
             for (const auto &result : timed_samples_record) {
                 FloatSample<Float> color(result.opl, result.mask);
@@ -75,7 +81,11 @@ public:
         } else {
             for (size_t i = 0; i < aovs_record.size(); ++i) {
                 if constexpr (is_polarized_v<Spectrum>) {
-                    auto const &stokes = timed_samples_record[i].radiance.coeff(0);
+                    Log(Info, "Rotating");
+                    auto const &stokes_prealign = timed_samples_record[i].radiance.coeff(0);
+                    auto const stokes = mueller::rotate_stokes_basis(-ray.d,
+                                                current_basis,
+                                                target_basis) * stokes_prealign;
                     for (int i = 3; i >= 0; --i) {
                         Color3f rgb;
                         if constexpr (is_monochromatic_v<Spectrum>) {
