@@ -96,7 +96,8 @@ public:
         bs.sampled_type = +BSDFFlags::DiffuseReflection;
         bs.sampled_component = 0;
 
-        Normal3f m = si.n;
+        // Calculate the half-direction vector
+        Vector3f H = normalize(bs.wo + si.wi);
 
         UnpolarizedSpectrum value = m_reflectance->eval(si, active);
 
@@ -113,8 +114,8 @@ public:
 
             /* The Stokes reference frame vector of this matrix lies perpendicular
                to the plane of reflection. */
-            Vector3f s_axis_in = normalize(cross(m, -wo_hat)),
-                     s_axis_out = normalize(cross(m, wi_hat));
+            Vector3f s_axis_in = normalize(cross(H, -wo_hat)),
+                     s_axis_out = normalize(cross(H, wi_hat));
 
             /* Rotate in/out reference vector of F s.t. it aligns with the implicit
                Stokes bases of -wo_hat & wi_hat. */
@@ -143,7 +144,8 @@ public:
         UnpolarizedSpectrum value =
             m_reflectance->eval(si, active) * math::InvPi<Float> * cos_theta_o;
 
-        Normal3f m = si.n;
+        // Calculate the half-direction vector
+        Vector3f H = normalize(wo + si.wi);
 
         if constexpr (is_polarized_v<Spectrum>) {
             /* Due to the coordinate system rotations for polarization-aware
@@ -158,8 +160,8 @@ public:
 
             /* The Stokes reference frame vector of this matrix lies perpendicular
                to the plane of reflection. */
-            Vector3f s_axis_in = normalize(cross(m, -wo_hat)),
-                     s_axis_out = normalize(cross(m, wi_hat));
+            Vector3f s_axis_in = normalize(cross(H, -wo_hat)),
+                     s_axis_out = normalize(cross(H, wi_hat));
 
             /* Rotate in/out reference vector of F s.t. it aligns with the implicit
                Stokes bases of -wo_hat & wi_hat. */
