@@ -64,12 +64,12 @@ Alternatively, the reflectance can be textured:
 
 */
 template <typename Float, typename Spectrum>
-class SmoothDiffuseFakePolarized final : public BSDF<Float, Spectrum> {
+class SmoothDiffuseFakePolarizedHalfAngle final : public BSDF<Float, Spectrum> {
 public:
     MTS_IMPORT_BASE(BSDF, m_flags, m_components)
     MTS_IMPORT_TYPES(Texture)
 
-    SmoothDiffuseFakePolarized(const Properties &props) : Base(props) {
+    SmoothDiffuseFakePolarizedHalfAngle(const Properties &props) : Base(props) {
         m_reflectance = props.texture<Texture>("reflectance", .5f);
         m_flags = BSDFFlags::DiffuseReflection | BSDFFlags::FrontSide;
         m_components.push_back(m_flags);
@@ -97,7 +97,7 @@ public:
         bs.sampled_component = 0;
 
         // Calculate the half-direction vector
-        Vector3f H = si.n;
+        Vector3f H = normalize(bs.wo + si.wi);
 
         UnpolarizedSpectrum value = m_reflectance->eval(si, active);
 
@@ -145,7 +145,7 @@ public:
             m_reflectance->eval(si, active) * math::InvPi<Float> * cos_theta_o;
 
         // Calculate the half-direction vector
-        Vector3f H = si.n;
+        Vector3f H = normalize(wo + si.wi);
 
         if constexpr (is_polarized_v<Spectrum>) {
             /* Due to the coordinate system rotations for polarization-aware
@@ -195,7 +195,7 @@ public:
 
     std::string to_string() const override {
         std::ostringstream oss;
-        oss << "SmoothDiffuseFakePolarized[" << std::endl
+        oss << "SmoothDiffuseFakePolarizedHalfAngle[" << std::endl
             << "  reflectance = " << string::indent(m_reflectance) << std::endl
             << "]";
         return oss.str();
@@ -206,6 +206,6 @@ private:
     ref<Texture> m_reflectance;
 };
 
-MTS_IMPLEMENT_CLASS_VARIANT(SmoothDiffuseFakePolarized, BSDF)
-MTS_EXPORT_PLUGIN(SmoothDiffuseFakePolarized, "Smooth diffuse fake-polarized material")
+MTS_IMPLEMENT_CLASS_VARIANT(SmoothDiffuseFakePolarizedHalfAngle, BSDF)
+MTS_EXPORT_PLUGIN(SmoothDiffuseFakePolarizedHalfAngle, "Smooth diffuse fake-polarized material using half-angle as fake normal for reflection")
 NAMESPACE_END(mitsuba)

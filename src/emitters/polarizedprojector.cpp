@@ -150,15 +150,18 @@ public:
         ray.update();
 
         Spectrum ret = unpolarized<Spectrum>(weight / pdf);
-        std::cout << "Polarizedray?  " << is_polarized_v<Spectrum> << std::endl;
 
-        if constexpr (is_polarized_v<Spectrum>) {
-            // Query rotation angle
+        if constexpr (is_polarized_v<Spectrum>) {            // Query rotation angle
             UnpolarizedSpectrum theta = deg_to_rad(m_theta->eval(si, active));
             // Get standard Mueller matrix for a linear polarizer.
             Spectrum M = mueller::linear_polarizer(1.f);
             // Rotate optical element by specified angle
             M = mueller::rotated_element(theta, M);
+            // Align with real dir axis
+            Vector3f vertical = trafo * Vector3f(0.f, 1.f, 0.f);
+            Vector3f current_basis = cross(ray.d, vertical);
+            Vector3f target_basis = mueller::stokes_basis(ray.d);
+            M = mueller::rotate_stokes_basis(ray.d, current_basis, target_basis) * M;
             return std::make_pair(ray,  (M * ret) & active);
         } else {
             return std::make_pair(ray,  ret & active);
@@ -211,6 +214,11 @@ public:
             Spectrum M = mueller::linear_polarizer(1.f);
             // Rotate optical element by specified angle
             M = mueller::rotated_element(theta, M);
+            // Align with real dir axis
+            Vector3f vertical = trafo * Vector3f(0.f, 1.f, 0.f);
+            Vector3f current_basis = cross(ds.d, vertical);
+            Vector3f target_basis = mueller::stokes_basis(ds.d);
+            M = mueller::rotate_stokes_basis(ds.d, current_basis, target_basis) * M;
             Spectrum polSpec = M * unpolarized<Spectrum>(spec);
             return {ds, polSpec & active};
         } else {
